@@ -29,6 +29,7 @@ kotlin {
 compose.desktop {
     application {
         mainClass = "ru.artem.alaverdyan.vspmlauncher.MainKt"
+        javaHome = System.getenv("JAVA_HOME_22_X64") ?: System.getenv("JAVA_HOME")
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Exe)
