@@ -58,7 +58,7 @@ compose.desktop {
                 // или любой online GUID generator) и закоммитить навсегда.
                 // Менять НЕЛЬЗЯ между релизами — иначе апгрейд сломается,
                 // Windows будет ставить каждую версию как отдельное приложение.
-                upgradeUuid = "PUT-YOUR-OWN-GUID-HERE"
+                upgradeUuid = "513f7603-b6b9-4515-9655-08c62bd47dd2"
             }
 
             macOS {
