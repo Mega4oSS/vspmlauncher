@@ -2,12 +2,12 @@ name: Build Windows Portable
 
 on:
   push:
-    branches: [ "main", "master" ] # Сборка будет запускаться при пуше в эти ветки
-  workflow_dispatch: # Позволит запускать сборку вручную кнопкой на GitHub
+    branches: [ "main", "master" ] # Сборка запустится при пуше в эти ветки
+  workflow_dispatch: # Позволяет запускать сборку вручную кнопкой на GitHub
 
 jobs:
   build-windows:
-    runs-on: windows-latest # Запускаем на виндовой машине гитхаба
+    runs-on: windows-latest
 
     steps:
       - name: Checkout project
@@ -16,20 +16,22 @@ jobs:
       - name: Set up JDK 22
         uses: actions/setup-java@v4
         with:
-          distribution: 'oracle' # Или 'zulu', у них у обоих есть стабильный JDK 22
+          distribution: 'oracle'
           java-version: '22'
-          cache: 'gradle' # Кэшируем зависимости, чтобы собиралось быстрее
+          cache: 'gradle'
 
       - name: Grant execute permission for gradlew
         run: git update-index --chmod=+x gradlew
         shell: bash
 
       - name: Build Portable App Image (EXE + JRE 22)
-        run: ./gradlew packageAppImage --no-daemon
+        # Явно вызываем таску внутри модуля :desktopApp
+        run: ./gradlew :desktopApp:packageAppImage --no-daemon
 
       - name: Archive Production Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Compose-App-Windows-Portable
-          path: build/compose/binaries/main/appImage/
-          retention-days: 5 # Ссылка на скачивание будет жить 5 дней
+          # Путь к результату сборки внутри модуля :desktopApp
+          path: desktopApp/build/compose/binaries/main/appImage/
+          retention-days: 5
