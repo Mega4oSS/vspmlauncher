@@ -1,0 +1,96 @@
+  git add .github/workflows/build-desktop-distributions.yml
+    git commit -m "Add GitHub Actions workflow for cross-platform desktop distribution builds (msi/deb/dmg)"
+  git pushname: build-desktop-distributions
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch: {}   # позволяет запускать вручную из вкладки Actions
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false   # если упадёт сборка на одной ОС, остальные всё равно доедут
+      matrix:
+        include:
+          - os: ubuntu-latest
+            task: :desktopApp:packageReleaseDeb
+            artifact_glob: desktopApp/build/compose/binaries/main-release/deb/*.deb
+            artifact_name: linux-deb
+          - os: windows-latest
+            task: :desktopApp:packageReleaseMsi
+            artifact_glob: desktopApp/build/compose/binaries/main-release/msi/*.msi
+            artifact_name: windows-msi
+          - os: macos-latest
+            task: :desktopApp:packageReleaseDmg
+            artifact_glob: desktopApp/build/compose/binaries/main-release/dmg/*.dmg
+            artifact_name: macos-dmg
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 22
+        uses: actions/setup-java@v4
+        with:
+          java-version: '22'
+          distribution: 'temurin'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      # WiX Toolset обычно уже стоит на windows-latest раннере,
+      # но на случай если образ поменяют — доустанавливаем явно.
+      - name: Ensure WiX Toolset (Windows only)
+        if: runner.os == 'Windows'
+        run: |
+          if (-not (Get-Command candle.exe -ErrorAction SilentlyContinue)) {
+            choco install wixtoolset -y
+          }
+        shell: pwsh
+
+      - name: Make gradlew executable (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: chmod +x ./gradlew
+
+      - name: Build distribution
+        run: ./gradlew ${{ matrix.task }} --stacktrace --no-daemon
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_glob }}
+          if-no-files-found: error
+
+  # Если пуш был по тегу вида v1.2.3 — собираем все три артефакта
+  # в один GitHub Release автоматически.
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/linux-deb/*.deb
+            dist/windows-msi/*.msi
+            dist/macos-dmg/*.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
