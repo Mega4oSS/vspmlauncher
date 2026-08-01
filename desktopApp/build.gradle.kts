@@ -39,16 +39,14 @@ compose.desktop {
             packageName = "VSPMLauncher"
             packageVersion = "1.0.0" // строго X.Y.Z, без суффиксов типа "-beta" — иначе MSI не соберётся
 
-            description = "Лаунчер сервера ВСПМ 5"
-            copyright = "© 2026 Artem Alaverdyan"
-            vendor = "Artem Alaverdyan"
+            description = "VSPM Launcher"
+            copyright = "(c) 2026 Artem Alaverdyan"
 
             windows {
                 // Нужен мультиразмерный .ico (16/32/48/256), не голый 32x32 —
                 // иначе Windows будет растягивать иконку там, где нужен крупный размер.
                 iconFile.set(project.file("logo/icon.ico"))
-
-                menuGroup = "ВСПМ 5"
+                menuGroup = "VSPM Launcher"
                 shortcut = true          // ярлык на рабочем столе
                 dirChooser = true        // разрешить выбрать папку установки
                 perUserInstall = true    // ставится в %LOCALAPPDATA%, без прав администратора
