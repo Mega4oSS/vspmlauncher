@@ -50,7 +50,7 @@ compose.desktop {
                 shortcut = true          // ярлык на рабочем столе
                 dirChooser = true        // разрешить выбрать папку установки
                 perUserInstall = true    // ставится в %LOCALAPPDATA%, без прав администратора
-                console = false          // true — только для отладки, покажет консольное окно
+                console = true          // true — только для отладки, покажет консольное окно
 
                 // Сгенерировать ОДИН раз (например: [System.Guid]::NewGuid() в PowerShell
                 // или любой online GUID generator) и закоммитить навсегда.
