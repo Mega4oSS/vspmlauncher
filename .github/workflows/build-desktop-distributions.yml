@@ -1,17 +1,15 @@
-  git add .github/workflows/build-desktop-distributions.yml
-    git commit -m "Add GitHub Actions workflow for cross-platform desktop distribution builds (msi/deb/dmg)"
-  git pushname: build-desktop-distributions
+name: build-desktop-distributions
 
 on:
   push:
     branches: [main]
     tags: ["v*"]
-  workflow_dispatch: {}   # позволяет запускать вручную из вкладки Actions
+  workflow_dispatch: {}
 
 jobs:
   build:
     strategy:
-      fail-fast: false   # если упадёт сборка на одной ОС, остальные всё равно доедут
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -49,8 +47,6 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      # WiX Toolset обычно уже стоит на windows-latest раннере,
-      # но на случай если образ поменяют — доустанавливаем явно.
       - name: Ensure WiX Toolset (Windows only)
         if: runner.os == 'Windows'
         run: |
@@ -73,8 +69,6 @@ jobs:
           path: ${{ matrix.artifact_glob }}
           if-no-files-found: error
 
-  # Если пуш был по тегу вида v1.2.3 — собираем все три артефакта
-  # в один GitHub Release автоматически.
   release:
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
