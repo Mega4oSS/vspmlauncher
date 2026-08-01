@@ -9,10 +9,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import ru.artem.alaverdyan.vspmlauncher.data.SettingsStorage
@@ -59,7 +62,7 @@ private fun launcherApp(decoratorEnabled: Boolean, useRealTransparency: Boolean)
         state = mainWindowState,
         resizable = true,
         undecorated = decoratorEnabled,
-        icon = painterResource("logo/icon_32x32.png"),
+        icon = painterResource("logo/icon-128.png"),
         transparent = useRealTransparency
     ) {
         LaunchedEffect(Unit) {
@@ -71,6 +74,16 @@ private fun launcherApp(decoratorEnabled: Boolean, useRealTransparency: Boolean)
         window.minimumSize = java.awt.Dimension(760, 480)
 
         val isMaximized = mainWindowState.placement == WindowPlacement.Maximized
+
+        // Реальный (не угаданный) размер/позиция окна до maximize — нужно
+        // самим сохранять их до переключения placement, т.к. WindowState
+        // после ухода в Maximized уже не хранит "тот" размер, а undecorated
+        // Frame.MAXIMIZED_BOTH — это Java-эмуляция, а не настоящий OS-статус,
+        // так что положиться тут на что-то нативное нельзя.
+        var restoredSize by remember { mutableStateOf(mainWindowState.size) }
+        var restoredPosition by remember { mutableStateOf(mainWindowState.position) }
+        val density = LocalDensity.current
+        val restoredWidthPx = with(density) { restoredSize.width.toPx() }.toInt()
         // Без настоящей прозрачности (fake-режим на Linux) скругление не рисуем —
         // окно непрозрачное, обрезанные Compose'ом углы превратились бы в чёрные
         // "уголки". Поэтому в fake-режиме окно прямоугольное, "прозрачность"
@@ -101,10 +114,30 @@ private fun launcherApp(decoratorEnabled: Boolean, useRealTransparency: Boolean)
                             onMinimize = { window.isMinimized = true },
                             onClose = ::exitApplication,
                             onMaximizeToggle = {
-                                mainWindowState.placement =
-                                    if (isMaximized) WindowPlacement.Floating else WindowPlacement.Maximized
+                                if (isMaximized) {
+                                    mainWindowState.placement = WindowPlacement.Floating
+                                    mainWindowState.size = restoredSize
+                                    mainWindowState.position = restoredPosition
+                                } else {
+                                    restoredSize = mainWindowState.size
+                                    restoredPosition = mainWindowState.position
+                                    mainWindowState.placement = WindowPlacement.Maximized
+                                }
                             },
                             isMaximized = isMaximized,
+                            onRestoreFromMaximizedDrag = { targetXPx, targetYPx ->
+                                // targetXPx/targetYPx приходят в экранных пикселях
+                                // (AWT window.x/y), а WindowPosition ждёт Dp
+                                mainWindowState.placement = WindowPlacement.Floating
+                                mainWindowState.size = restoredSize
+                                with(density) {
+                                    mainWindowState.position = WindowPosition(
+                                        targetXPx.toDp(),
+                                        targetYPx.toDp()
+                                    )
+                                }
+                            },
+                            restoredWidthPx = restoredWidthPx,
                             cornerRadius = activeCornerRadius
                         )
                     }
