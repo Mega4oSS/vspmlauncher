@@ -45,7 +45,7 @@ compose.desktop {
             windows {
                 // Нужен мультиразмерный .ico (16/32/48/256), не голый 32x32 —
                 // иначе Windows будет растягивать иконку там, где нужен крупный размер.
-                iconFile.set(project.file("logo/icon-48.ico"))
+                iconFile.set(project.file("logo/icon.ico"))
 
                 menuGroup = "ВСПМ 5"
                 shortcut = true          // ярлык на рабочем столе
