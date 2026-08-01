@@ -34,8 +34,9 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
 
             // Имя, которое видит пользователь (exe/ярлык/папка установки) —
-            // НЕ то же самое, что application ID. Без точек, покороче.
-            packageName = "VSPM Launcher"
+            // НЕ то же самое, что application ID. Без пробелов — у jpackage/WiX
+            // бывают проблемы с пробелами в имени пакета/exe.
+            packageName = "VSPMLauncher"
             packageVersion = "1.0.0" // строго X.Y.Z, без суффиксов типа "-beta" — иначе MSI не соберётся
 
             description = "Лаунчер сервера ВСПМ 5"
@@ -57,7 +58,7 @@ compose.desktop {
                 // или любой online GUID generator) и закоммитить навсегда.
                 // Менять НЕЛЬЗЯ между релизами — иначе апгрейд сломается,
                 // Windows будет ставить каждую версию как отдельное приложение.
-                upgradeUuid = "513f7603-b6b9-4515-9655-08c62bd47dd2"
+                upgradeUuid = "PUT-YOUR-OWN-GUID-HERE"
             }
 
             macOS {
@@ -70,10 +71,10 @@ compose.desktop {
             }
 
             linux {
-                iconFile.set(project.file("logo/icon-512.png")) // обычный png, 512x512+
+                iconFile.set(project.file("logo/icon.png")) // обычный png, 512x512+
                 packageName = "vspmlauncher"
                 menuGroup = "ВСПМ 5"
-                debMaintainer = "mega4osss@gmail.com" // TODO: заменить на реальный контакт
+                debMaintainer = "you@example.com" // TODO: заменить на реальный контакт
             }
         }
 
@@ -125,14 +126,10 @@ tasks.register("patchLinuxLauncherEnv") {
     }
 }
 
-// Автоматически патчим после сборки app-image и после сборки .deb
-// (deb собирается ИЗ app-image, поэтому патч app-image "наследуется" в пакет,
-// если patchLinuxLauncherEnv отработает раньше упаковки — см. ordering ниже).
 afterEvaluate {
     tasks.findByName("createDistributable")?.finalizedBy("patchLinuxLauncherEnv")
-    tasks.findByName("packageDeb")?.let { debTask ->
-        tasks.findByName("patchLinuxLauncherEnv")?.let { patchTask ->
-            debTask.dependsOn(patchTask)
-        }
-    }
+}
+
+afterEvaluate {
+    tasks.findByName("packageDeb")?.finalizedBy("patchDebLauncherEnv")
 }

@@ -4,12 +4,12 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
-  workflow_dispatch: {}
+  workflow_dispatch: {}   # позволяет запускать вручную из вкладки Actions
 
 jobs:
   build:
     strategy:
-      fail-fast: false
+      fail-fast: false   # если упадёт сборка на одной ОС, остальные всё равно доедут
       matrix:
         include:
           - os: ubuntu-latest
@@ -47,6 +47,8 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
+      # WiX Toolset обычно уже стоит на windows-latest раннере,
+      # но на случай если образ поменяют — доустанавливаем явно.
       - name: Ensure WiX Toolset (Windows only)
         if: runner.os == 'Windows'
         run: |
@@ -62,6 +64,14 @@ jobs:
       - name: Build distribution
         run: ./gradlew ${{ matrix.task }} --stacktrace --no-daemon
 
+      - name: Show jpackage error log on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "=== Searching for jpackage error logs ==="
+          find . -path "*/compose/logs/*" -name "*-err.txt" -exec echo "--- {} ---" \; -exec cat {} \;
+          find . -path "*/compose/logs/*" -name "*-out.txt" -exec echo "--- {} ---" \; -exec cat {} \;
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -69,6 +79,8 @@ jobs:
           path: ${{ matrix.artifact_glob }}
           if-no-files-found: error
 
+  # Если пуш был по тегу вида v1.2.3 — собираем все три артефакта
+  # в один GitHub Release автоматически.
   release:
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
