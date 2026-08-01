@@ -1,37 +1,108 @@
-name: Build Windows Portable
+name: build-desktop-distributions
 
 on:
   push:
-    branches: [ "main", "master" ] # Сборка запустится при пуше в эти ветки
-  workflow_dispatch: # Позволяет запускать сборку вручную кнопкой на GitHub
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch: {}   # позволяет запускать вручную из вкладки Actions
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      fail-fast: false   # если упадёт сборка на одной ОС, остальные всё равно доедут
+      matrix:
+        include:
+          - os: ubuntu-latest
+            task: :desktopApp:packageReleaseDeb
+            artifact_glob: desktopApp/build/compose/binaries/main-release/deb/*.deb
+            artifact_name: linux-deb
+          - os: windows-latest
+            task: :desktopApp:packageReleaseExe
+            artifact_glob: desktopApp/build/compose/binaries/main-release/exe/*.exe
+            artifact_name: windows-exe
+          - os: macos-latest
+            task: :desktopApp:packageReleaseDmg
+            artifact_glob: desktopApp/build/compose/binaries/main-release/dmg/*.dmg
+            artifact_name: macos-dmg
+
+    runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout project
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up JDK 22
         uses: actions/setup-java@v4
         with:
-          distribution: 'oracle'
           java-version: '22'
-          cache: 'gradle'
+          distribution: 'temurin'
 
-      - name: Grant execute permission for gradlew
-        run: git update-index --chmod=+x gradlew
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      # WiX Toolset обычно уже стоит на windows-latest раннере,
+      # но на случай если образ поменяют — доустанавливаем явно.
+      # Нужен и для Exe, и для Msi (jpackage использует одни и те же candle/light).
+      - name: Ensure WiX Toolset (Windows only)
+        if: runner.os == 'Windows'
+        run: |
+          if (-not (Get-Command candle.exe -ErrorAction SilentlyContinue)) {
+            choco install wixtoolset -y
+          }
+        shell: pwsh
+
+      - name: Add WiX to PATH (Windows only)
+        if: runner.os == 'Windows'
+        run: echo "C:\Program Files (x86)\WiX Toolset v3.14\bin" >> $env:GITHUB_PATH
+        shell: pwsh
+
+      - name: Make gradlew executable (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: chmod +x ./gradlew
+
+      - name: Build distribution
+        run: ./gradlew ${{ matrix.task }} --stacktrace --no-daemon
+
+      - name: Show jpackage error log on failure
+        if: failure()
         shell: bash
+        run: |
+          echo "=== Searching for jpackage error logs ==="
+          find . -path "*/compose/logs/*" -name "*-err.txt" -exec echo "--- {} ---" \; -exec cat {} \;
+          find . -path "*/compose/logs/*" -name "*-out.txt" -exec echo "--- {} ---" \; -exec cat {} \;
 
-      - name: Build Portable App Image (EXE + JRE 22)
-        # Явно вызываем таску внутри модуля :desktopApp
-        run: ./gradlew :desktopApp:packageAppImage --no-daemon
-
-      - name: Archive Production Artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Compose-App-Windows-Portable
-          # Путь к результату сборки внутри модуля :desktopApp
-          path: desktopApp/build/compose/binaries/main/appImage/
-          retention-days: 5
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_glob }}
+          if-no-files-found: error
+
+  # Если пуш был по тегу вида v1.2.3 — собираем все три артефакта
+  # в один GitHub Release автоматически.
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/linux-deb/*.deb
+            dist/windows-exe/*.exe
+            dist/macos-dmg/*.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -31,7 +31,7 @@ compose.desktop {
         mainClass = "ru.artem.alaverdyan.vspmlauncher.MainKt"
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Exe)
 
             // Имя, которое видит пользователь (exe/ярлык/папка установки) —
             // НЕ то же самое, что application ID. Без пробелов — у jpackage/WiX
