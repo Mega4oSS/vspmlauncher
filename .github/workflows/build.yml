@@ -16,6 +16,11 @@ jobs:
             task: :desktopApp:packageReleaseDeb
             artifact_glob: desktopApp/build/compose/binaries/main-release/deb/*.deb
             artifact_name: linux-deb
+          - os: ubuntu-latest
+            task: :desktopApp:packageReleaseRpm
+            artifact_glob: desktopApp/build/compose/binaries/main-release/rpm/*.rpm
+            artifact_name: linux-rpm
+            rpm: true
           - os: windows-latest
             task: :desktopApp:packageReleaseExe
             artifact_glob: desktopApp/build/compose/binaries/main-release/exe/*.exe
@@ -66,6 +71,17 @@ jobs:
         run: echo "C:\Program Files (x86)\WiX Toolset v3.14\bin" >> $env:GITHUB_PATH
         shell: pwsh
 
+      # rpmbuild не входит в образ ubuntu-latest по умолчанию — без него
+      # jpackage тихо падает на этапе упаковки .rpm.
+      - name: Ensure rpmbuild (Linux rpm only)
+        if: matrix.rpm == true
+        run: |
+          if ! command -v rpmbuild &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y rpm
+          fi
+        shell: bash
+
       - name: Make gradlew executable (Linux/macOS)
         if: runner.os != 'Windows'
         run: chmod +x ./gradlew
@@ -111,6 +127,7 @@ jobs:
         with:
           files: |
             dist/linux-deb/*.deb
+            dist/linux-rpm/*.rpm
             dist/windows-exe/*.exe
             dist/windows-portable/*.zip
             dist/macos-dmg/*.dmg

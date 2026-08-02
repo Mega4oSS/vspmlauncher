@@ -32,7 +32,7 @@ compose.desktop {
         javaHome = System.getenv("JAVA_HOME_22_X64") ?: System.getenv("JAVA_HOME")
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Exe)
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.Exe)
 
             // Имя, которое видит пользователь (exe/ярлык/папка установки) —
             // НЕ то же самое, что application ID. Без пробелов — у jpackage/WiX
@@ -74,6 +74,10 @@ compose.desktop {
                 packageName = "vspmlauncher"
                 menuGroup = "ВСПМ 5"
                 debMaintainer = "you@example.com" // TODO: заменить на реальный контакт
+
+                // Обязателен для сборки .rpm — jpackage/rpmbuild падает без указания
+                // типа лицензии (это поле, а не проверка юридической корректности).
+                rpmLicenseType = "MIT" // TODO: заменить на реальную лицензию проекта
             }
         }
 
