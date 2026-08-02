@@ -24,6 +24,7 @@ import java.security.MessageDigest
 
 object LauncherConfig {
     const val BASE_URL = "http://168.222.203.250:8080"
+    //const val BASE_URL = "http://0.0.0.0:8080"
     const val MINECRAFT_VERSION = "1.21.1"
 
     val GAME_CHANNELS: List<String> = listOf(

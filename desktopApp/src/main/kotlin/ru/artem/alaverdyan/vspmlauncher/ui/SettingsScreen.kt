@@ -54,6 +54,9 @@ fun SettingsScreen(
     onRuntimeIdChange: (String) -> Unit,
     jrePath: String,
     onJrePathChange: (String) -> Unit,
+    installDir: String,
+    hasExistingInstall: Boolean = false,
+    onInstallDirChange: (String) -> Unit = {},
     jvmArgs: String,
     downloadJreFromOfficial: Boolean,
     onDownloadJreFromOfficialChange: (Boolean) -> Unit,
@@ -107,6 +110,7 @@ fun SettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(24.dp)
                     ) {
                         NicknameSection(currentNickname, onNicknameChange, scale)
+                        InstallDirSection(installDir, hasExistingInstall, onInstallDirChange, scale)
                         RamSection(ramMb, onRamChange, scale)
                         RuntimeSection(runtimeId, onRuntimeIdChange, scale)
                         LaunchBehaviorSection(launchBehavior, onLaunchBehaviorChange, scale)
@@ -723,6 +727,68 @@ private fun NicknameSection(
             }
         }
     }
+}
+
+@Composable
+private fun InstallDirSection(
+    installDir: String,
+    hasExistingInstall: Boolean,
+    onInstallDirChange: (String) -> Unit,
+    scale: Float
+) {
+    val scope = rememberCoroutineScope()
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel("Папка установки", scale)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = installDir,
+                color = Color.White,
+                fontSize = (13 * scale).sp,
+                modifier = Modifier.weight(1f).padding(vertical = 12.dp)
+            )
+            TextButton(onClick = {
+                scope.launch {
+                    val picked = withContext(Dispatchers.IO) { pickInstallDirectory(File(installDir)) }
+                    if (picked != null) onInstallDirChange(picked.absolutePath)
+                }
+            }) {
+                Text("Обзор...", color = Color.White.copy(alpha = 0.8f), fontSize = (13 * scale).sp)
+            }
+        }
+        Text(
+            if (hasExistingInstall)
+                "Сюда лаунчер уже поставил игру, рантаймы Java и служебные файлы. Смена пути НЕ " +
+                        "переносит уже установленные файлы — лаунчер просто предложит установить " +
+                        "игру заново в новом месте (кнопка «Установить» ещё раз спросит папку)."
+            else
+                "Сюда лаунчер поставит игру, рантаймы Java и служебные файлы. По умолчанию — " +
+                        "папка в домашней директории. Кнопка «Установить» на главном экране тоже " +
+                        "предложит выбрать (или подтвердить) этот путь перед первой загрузкой.",
+            color = Color.White.copy(alpha = 0.45f),
+            fontSize = (12 * scale).sp
+        )
+    }
+}
+
+// Директорию выбираем через JFileChooser (не FileDialog, как для jar-файла выше) — FileDialog
+// умеет выбирать папки только на macOS через недокументированное системное свойство, а
+// JFileChooser с DIRECTORIES_ONLY работает одинаково на Windows/Linux/macOS.
+internal fun pickInstallDirectory(initial: File): File? {
+    val chooser = javax.swing.JFileChooser(initial.takeIf { it.exists() } ?: initial.parentFile).apply {
+        fileSelectionMode = javax.swing.JFileChooser.DIRECTORIES_ONLY
+        isAcceptAllFileFilterUsed = false
+        dialogTitle = "Выбрать папку для установки"
+        selectedFile = initial
+    }
+    val result = chooser.showDialog(null, "Выбрать")
+    return if (result == javax.swing.JFileChooser.APPROVE_OPTION) chooser.selectedFile else null
 }
 
 @Composable

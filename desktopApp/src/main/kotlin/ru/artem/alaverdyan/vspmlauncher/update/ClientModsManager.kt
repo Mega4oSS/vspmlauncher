@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import ru.artem.alaverdyan.vspmlauncher.data.AppPaths
 import ru.artem.alaverdyan.vspmlauncher.data.CLIENT_MODS_DIR
 import ru.artem.alaverdyan.vspmlauncher.data.LocalClientMod
 import ru.artem.alaverdyan.vspmlauncher.data.LocalModSource
@@ -37,7 +38,7 @@ private data class ManagedState(
     val server: MutableMap<String, ServerEntry> = mutableMapOf() // key = ClientModEntryDto.id
 )
 
-private val STATE_FILE = File(System.getProperty("user.home"), ".vspmlauncher/client-mods-managed.json")
+private val STATE_FILE: File get() = AppPaths.clientModsStateFile()
 
 data class ClientModsSyncResult(
     val installed: List<String> = emptyList(),

@@ -1,5 +1,6 @@
 package ru.artem.alaverdyan.vspmlauncher.data
 
+import java.io.File
 import java.util.prefs.Preferences
 
 /**
@@ -38,6 +39,7 @@ object SettingsStorage {
     private const val KEY_DOWNLOAD_JRE_FROM_OFFICIAL = "download_jre_from_official"
     private const val KEY_DOWNLOAD_MINECRAFT_FROM_OFFICIAL = "download_minecraft_from_official"
     private const val KEY_JRE_PATH = "jre_path"
+    private const val KEY_INSTALL_DIR = "install_dir"
     private const val KEY_JVM_ARGS = "jvm_args"
     private const val KEY_APP_DECORATOR_ENABLED = "app_decorator_enabled"
     private const val KEY_TRANSPARENCY_MODE = "transparency_mode"
@@ -64,6 +66,16 @@ object SettingsStorage {
     fun loadJrePath(): String = prefs.get(KEY_JRE_PATH, "")
     fun saveJrePath(path: String) {
         prefs.put(KEY_JRE_PATH, path)
+    }
+
+    // Корневая папка, куда лаунчер ставит игру, рантаймы Java и служебные файлы
+    // (все они лежат внутри неё в подпапках game/, runtimes/ и т.д.). По умолчанию —
+    // "<домашняя папка>/.vspmlauncher", как было всегда захардкожено. Пользователь может
+    // сменить путь в настройках или прямо в диалоге выбора при первой установке.
+    fun defaultInstallDir(): String = File(System.getProperty("user.home"), ".vspmlauncher").absolutePath
+    fun loadInstallDir(): String = prefs.get(KEY_INSTALL_DIR, defaultInstallDir())
+    fun saveInstallDir(path: String) {
+        prefs.put(KEY_INSTALL_DIR, path)
     }
 
     fun loadJvmArgs(): String = prefs.get(KEY_JVM_ARGS, "")

@@ -5,6 +5,7 @@ import io.ktor.client.statement.bodyAsChannel
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import ru.artem.alaverdyan.vspmlauncher.data.AppPaths
 import ru.artem.alaverdyan.vspmlauncher.data.SettingsStorage
 import ru.artem.alaverdyan.vspmlauncher.network.LauncherApi
 import ru.artem.alaverdyan.vspmlauncher.network.RuntimeEntryDto
@@ -13,10 +14,15 @@ import ru.artem.alaverdyan.vspmlauncher.update.ProgressPhase
 import ru.artem.alaverdyan.vspmlauncher.update.withRetry
 import java.io.File
 
-private val RUNTIMES_ROOT = File(System.getProperty("user.home"), ".vspmlauncher/runtimes")
+private val RUNTIMES_ROOT: File get() = AppPaths.runtimesDir()
 
 sealed interface RuntimeStatus {
-    data object Missing : RuntimeStatus
+    // reason — по-человечески объясняет, ПОЧЕМУ рантайм не найден: нет подходящей записи
+    // в манифесте для этой платформы или архив скачался, но java-бинарник внутри не нашёлся.
+    // Раньше это был data object без подробностей, и на Windows пользователь видел одно и то
+    // же общее "Java Runtime не найден" что при отсутствии записи в манифесте, что при битом
+    // архиве — невозможно было понять, что чинить.
+    data class Missing(val reason: String) : RuntimeStatus
     data class Installed(val javaBinary: File, val version: String) : RuntimeStatus
 }
 
@@ -31,9 +37,43 @@ object RuntimeManager {
         onProgress: (DownloadProgress?) -> Unit = {}
     ): RuntimeStatus = withContext(Dispatchers.IO) {
         val manifest = LauncherApi.getRuntimes()
-        val entry = manifest.runtimes.find {
-            it.id == id && it.os == PlatformInfo.os && it.arch == PlatformInfo.arch
-        } ?: return@withContext RuntimeStatus.Missing
+        // Сравнение регистронезависимое: бэкенд отдаёт os/arch как обычные строки, и если
+        // там когда-то попадёт "Windows" вместо "windows" (или наоборот), раньше find() молча
+        // не находил запись и лаунчер говорил "рантайм не найден", хотя на сервере он есть.
+        val platformEntry = manifest.runtimes.find {
+            it.id.equals(id, ignoreCase = true) &&
+                    it.os.equals(PlatformInfo.os, ignoreCase = true) &&
+                    it.arch.equals(PlatformInfo.arch, ignoreCase = true)
+        }
+
+        // ВАЖНО: официальному источнику (Adoptium/GraalVM) не нужно, чтобы ЛОКАЛЬНЫЙ бэкенд уже
+        // держал зеркало именно под текущую платформу — Adoptium/GraalVM сами прекрасно знают,
+        // что у них есть под Windows/Linux/macOS. С сервера реально нужна только версия (какой
+        // фича-релиз считается актуальным для id=$id) — а её можно взять из ЛЮБОЙ платформы, для
+        // которой этот id вообще опубликован. Раньше при отсутствии platformEntry код возвращал
+        // Missing СРАЗУ, ещё до того, как вообще пробовал официальный источник — поэтому тумблер
+        // "качать с официальных серверов" не спасал, даже если на Adoptium архив 100% есть.
+        val useOfficial = SettingsStorage.loadDownloadJreFromOfficial()
+        val referenceEntry = platformEntry ?: manifest.runtimes.find { it.id.equals(id, ignoreCase = true) }
+
+        if (platformEntry == null && (!useOfficial || referenceEntry == null)) {
+            return@withContext RuntimeStatus.Missing(
+                "на сервере нет сборки рантайма \"$id\" для платформы ${PlatformInfo.os}-${PlatformInfo.arch}. " +
+                        "Доступные варианты для этой платформы: " +
+                        (manifest.runtimes.filter {
+                            it.os.equals(PlatformInfo.os, ignoreCase = true) && it.arch.equals(PlatformInfo.arch, ignoreCase = true)
+                        }.map { it.id }.ifEmpty { listOf("нет ни одного") }.joinToString(", ")) +
+                        if (!useOfficial) ". Можно попробовать включить в настройках \"Java Runtime с официальных серверов\"." else ""
+            )
+        }
+
+        // entry.version берём хоть с чужой платформы (referenceEntry), если под нашу платформу
+        // на сервере ничего нет — но sha256/size/url из неё валидны ТОЛЬКО когда это
+        // platformEntry (т.е. реально с сервера под нашу платформу). Если мы тут оказались через
+        // referenceEntry — проверять архив по контрольной сумме не по чему, доверяем TLS-соединению
+        // напрямую с Adoptium/GraalVM (verifiedBySha256 = false отключает сверку ниже).
+        val entry = platformEntry ?: referenceEntry!!
+        val verifiedBySha256 = platformEntry != null
 
         val dir = runtimeDir(id)
         val marker = versionMarker(id)
@@ -42,7 +82,17 @@ object RuntimeManager {
             findJavaBinary(dir)?.let { return@withContext RuntimeStatus.Installed(it, entry.version) }
         }
 
-        val downloadUrl = resolveDownloadUrl(entry)
+        val downloadUrl = if (platformEntry != null) {
+            resolveDownloadUrl(entry)
+        } else {
+            // Своего зеркала под эту платформу на сервере нет — единственный вариант это
+            // официальный источник, строим ссылку под РЕАЛЬНУЮ платформу пользователя (entry
+            // могла прийти с другой платформы, поэтому явно подставляем свои os/arch).
+            OfficialSources.resolveUrl(entry.copy(os = PlatformInfo.os, arch = PlatformInfo.arch))
+                ?: return@withContext RuntimeStatus.Missing(
+                    "не удалось построить ссылку на официальный источник для \"$id\" ${PlatformInfo.os}-${PlatformInfo.arch}"
+                )
+        }
         val archiveExt = if (downloadUrl.endsWith(".zip")) "zip" else "tar.gz"
         val archive = File(RUNTIMES_ROOT, "$id-download.$archiveExt")
         archive.parentFile?.mkdirs()
@@ -54,7 +104,10 @@ object RuntimeManager {
         // Раньше архив вообще не сверялся по sha256 — битая/оборванная закачка молча
         // распаковывалась как есть. Проверяем, и если мимо — пробуем зеркало лаунчера
         // (тот же приём, что и в Downloader.downloadAll для файлов сборки).
-        if (sha256Of(archive) != entry.sha256) {
+        // Сверять есть по чему только если entry реально с сервера под нашу платформу
+        // (platformEntry) — иначе (архив взят напрямую с Adoptium/GraalVM по referenceEntry
+        // с чужой платформы) эталонного sha256 просто нет, доверяем TLS-соединению.
+        if (verifiedBySha256 && sha256Of(archive) != entry.sha256) {
             val mirrorUrl = LauncherApi.resolveUrl(entry.url)
             if (mirrorUrl != downloadUrl) {
                 withRetry("скачивание рантайма ${entry.id} ${entry.version} (зеркало)") {
@@ -86,7 +139,11 @@ object RuntimeManager {
         marker.writeText(entry.version)
         onProgress(null)
 
-        val javaBinary = findJavaBinary(dir) ?: return@withContext RuntimeStatus.Missing
+        val javaBinary = findJavaBinary(dir) ?: return@withContext RuntimeStatus.Missing(
+            "архив рантайма \"$id\" скачался и распаковался (в ${dir.absolutePath}), но внутри не " +
+                    "нашёлся исполняемый файл \"${PlatformInfo.javaBinaryName}\" в подпапке bin — похоже, " +
+                    "архив для этой платформы собран неправильно"
+        )
         RuntimeStatus.Installed(javaBinary, entry.version)
     }
 

@@ -64,7 +64,6 @@ import ru.artem.alaverdyan.vspmlauncher.ui.components.AdminAuthDialog
 import kotlin.system.exitProcess
 import java.io.File
 
-private val INSTALL_DIR = File(System.getProperty("user.home"), ".vspmlauncher/game")
 private const val POLL_INTERVAL_MS = 60_000L
 private const val LAUNCH_CHECK_THROTTLE_MS = 60 * 60 * 1000L
 private val screenOrder: Map<Screen, Int> = mapOf(
@@ -126,6 +125,11 @@ fun App(
     var runtimeId by remember { mutableStateOf(SettingsStorage.loadRuntimeId()) }
     var ramMb by remember { mutableStateOf(SettingsStorage.loadRamMb()) }
     var jrePath by remember { mutableStateOf(SettingsStorage.loadJrePath()) }
+    // Корневая папка установки (родитель game/). По умолчанию — путь в домашней папке
+    // пользователя (SettingsStorage.defaultInstallDir()). Меняется либо в настройках, либо
+    // через диалог выбора папки при первой установке (см. onLaunchOrUpdate ниже).
+    var installBaseDir by remember { mutableStateOf(SettingsStorage.loadInstallDir()) }
+    fun currentInstallDir(): File = File(installBaseDir, "game")
     var jvmArgs by remember { mutableStateOf(SettingsStorage.loadJvmArgs()) }
     var launchBehavior by remember { mutableStateOf(SettingsStorage.loadLaunchBehavior()) }
     var appDecoratorEnabled by remember { mutableStateOf(SettingsStorage.loadAppDecoratorEnabled()) }
@@ -197,7 +201,7 @@ fun App(
                 }
                 refreshModsNeedSync()
             }
-            val installedVersions = withContext(Dispatchers.IO) { VersionStorage.load(INSTALL_DIR) }
+            val installedVersions = withContext(Dispatchers.IO) { VersionStorage.load(currentInstallDir()) }
             val plans = LauncherApi.getUpdatePlans(installedVersions)
 
             news = newsDto.map { NewsItem(title = it.title, body = it.body) }
@@ -217,7 +221,7 @@ fun App(
             lastCheckedAt = System.currentTimeMillis()
 
             hasExistingInstall = withContext(Dispatchers.IO) {
-                File(INSTALL_DIR, "client.jar").exists()
+                File(currentInstallDir(), "client.jar").exists()
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -247,7 +251,7 @@ fun App(
                 }
 
                 totalChecked += manifest.files.size
-                val broken = FileIntegrityVerifier.findBroken(INSTALL_DIR, manifest.files) { checked, total ->
+                val broken = FileIntegrityVerifier.findBroken(currentInstallDir(), manifest.files) { checked, total ->
                     downloadProgress = DownloadProgress(
                         phase = ProgressPhase.VERIFYING,
                         currentFile = channel,
@@ -261,7 +265,7 @@ fun App(
 
                 if (broken.isNotEmpty()) {
                     runCatching {
-                        Downloader.downloadAll(INSTALL_DIR, broken) { progress -> downloadProgress = progress }
+                        Downloader.downloadAll(currentInstallDir(), broken) { progress -> downloadProgress = progress }
                     }.onSuccess {
                         totalRepaired += broken.size
                     }.onFailure { e ->
@@ -274,8 +278,8 @@ fun App(
                 val status = RuntimeManager.ensureInstalled(runtimeId, forceReinstall = true) { progress ->
                     downloadProgress = progress
                 }
-                if (status !is RuntimeStatus.Installed) {
-                    failures += "Java Runtime: рантайм не найден для текущей платформы ($runtimeId)"
+                if (status is RuntimeStatus.Missing) {
+                    failures += "Java Runtime: ${status.reason}"
                 }
             }.onFailure { e ->
                 failures += "Java Runtime: ${e.message ?: e.toString()}"
@@ -304,7 +308,7 @@ fun App(
             val launchResult: LaunchResult = withContext(Dispatchers.IO) {
                 GameLauncher.launch(
                     LaunchParams(
-                        installDir = INSTALL_DIR,
+                        installDir = currentInstallDir(),
                         javaBinary = javaBinary,
                         ramMb = ramMb.toInt(),
                         nickname = nickname ?: "Player",
@@ -338,7 +342,7 @@ fun App(
     }
 
     LaunchedEffect(Unit) {
-        INSTALL_DIR.mkdirs()
+        currentInstallDir().mkdirs()
         checkForUpdates()
         isLoading = false
     }
@@ -463,9 +467,25 @@ fun App(
                                 launchError = null
                                 try {
                                     if (needsUpdate) {
+                                        // Первая установка (папки игры ещё нет) — сперва спрашиваем,
+                                        // куда ставить, предлагая текущий настроенный путь (по умолчанию —
+                                        // путь в домашней папке пользователя). Если человек передумал —
+                                        // отменяем клик, ничего не качаем.
+                                        if (!hasExistingInstall) {
+                                            val chosen = withContext(Dispatchers.IO) {
+                                                pickInstallDirectory(File(installBaseDir))
+                                            }
+                                            if (chosen == null) {
+                                                return@launch
+                                            }
+                                            installBaseDir = chosen.absolutePath
+                                            SettingsStorage.saveInstallDir(installBaseDir)
+                                            currentInstallDir().mkdirs()
+                                        }
+
                                         val allConflicts = mutableListOf<ConflictInfo>()
                                         pendingPlans.filter { !it.upToDate }.forEach { plan ->
-                                            val planConflicts = UpdatePlanExecutor.apply(INSTALL_DIR, plan) { progress ->
+                                            val planConflicts = UpdatePlanExecutor.apply(currentInstallDir(), plan) { progress ->
                                                 downloadProgress = progress
                                             }
                                             allConflicts += planConflicts
@@ -495,8 +515,8 @@ fun App(
                                                 is RuntimeStatus.Installed -> {
                                                     launchGameAndWatch(status.javaBinary)
                                                 }
-                                                RuntimeStatus.Missing -> {
-                                                    launchError = "Java Runtime не найден для текущей платформы/варианта ($runtimeId). Проверь выбор рантайма в настройках."
+                                                is RuntimeStatus.Missing -> {
+                                                    launchError = "Java Runtime не найден для текущей платформы/варианта ($runtimeId): ${status.reason}"
                                                 }
                                             }
                                         }
@@ -536,6 +556,12 @@ fun App(
                         onJrePathChange = { updated ->
                             jrePath = updated
                             SettingsStorage.saveJrePath(updated)
+                        },
+                        installDir = installBaseDir,
+                        hasExistingInstall = hasExistingInstall,
+                        onInstallDirChange = { updated ->
+                            installBaseDir = updated
+                            SettingsStorage.saveInstallDir(updated)
                         },
                         jvmArgs = jvmArgs,
                         onJvmArgsChange = { updated ->
