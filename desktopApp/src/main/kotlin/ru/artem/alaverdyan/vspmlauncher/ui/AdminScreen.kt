@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import ru.artem.alaverdyan.vspmlauncher.network.AnalyticsSummaryDto
 import ru.artem.alaverdyan.vspmlauncher.network.BuildDiffDto
 import ru.artem.alaverdyan.vspmlauncher.network.LauncherApi
 import ru.artem.alaverdyan.vspmlauncher.network.LauncherConfig
@@ -45,7 +46,9 @@ fun AdminScreen(sessionToken: String, onBack: () -> Unit) {
     var maintenanceMessage by remember { mutableStateOf("") }
     var isMaintenanceBusy by remember { mutableStateOf(false) }
     var maintenanceStatusMessage by remember { mutableStateOf<String?>(null) }
-
+    var analytics by remember { mutableStateOf<AnalyticsSummaryDto?>(null) }
+    var isAnalyticsBusy by remember { mutableStateOf(false) }
+    var analyticsError by remember { mutableStateOf<String?>(null) }
     var newsList by remember { mutableStateOf<List<NewsItemDto>>(emptyList()) }
     var newsTitle by remember { mutableStateOf("") }
     var newsBody by remember { mutableStateOf("") }
@@ -324,6 +327,87 @@ fun AdminScreen(sessionToken: String, onBack: () -> Unit) {
                                     }
                                 }
                             )
+                        }
+                    }
+                }
+            }
+
+            GlassPanel(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp * scale)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Статистика",
+                            color = Color.White, fontWeight = FontWeight.Bold, fontSize = (14 * scale).sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        GlassButton(
+                            text = if (isAnalyticsBusy) "..." else "Обновить",
+                            enabled = !isAnalyticsBusy,
+                            scale = scale,
+                            onClick = {
+                                isAnalyticsBusy = true
+                                analyticsError = null
+                                scope.launch {
+                                    try {
+                                        analytics = LauncherApi.adminAnalytics(sessionToken)
+                                    } catch (e: Exception) {
+                                        analyticsError = "Не удалось загрузить статистику"
+                                    }
+                                    isAnalyticsBusy = false
+                                }
+                            }
+                        )
+                    }
+
+                    analyticsError?.let {
+                        Spacer(Modifier.height(6.dp * scale))
+                        Text(it, color = Color(0xFFFFC107), fontSize = (13 * scale).sp)
+                    }
+
+                    val summary = analytics
+                    if (summary == null) {
+                        Spacer(Modifier.height(6.dp * scale))
+                        Text("Нажми «Обновить», чтобы загрузить", color = Color.White.copy(alpha = 0.5f), fontSize = (13 * scale).sp)
+                    } else {
+                        Spacer(Modifier.height(10.dp * scale))
+
+                        Text("Уникальных клиентов: ${summary.uniqueClients}", color = Color.White, fontSize = (13 * scale).sp)
+                        Spacer(Modifier.height(10.dp * scale))
+
+                        Text("События", color = Color(0xFF80D8FF), fontWeight = FontWeight.Bold, fontSize = (13 * scale).sp)
+                        if (summary.eventCounts.isEmpty()) {
+                            Text("Нет данных", color = Color.White.copy(alpha = 0.5f), fontSize = (12 * scale).sp)
+                        } else {
+                            summary.eventCounts.entries.sortedByDescending { it.value }.forEach { (type, count) ->
+                                Text("   $type: $count", color = Color.White.copy(alpha = 0.85f), fontSize = (12 * scale).sp)
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp * scale))
+
+                        Text("Админ-панель", color = Color(0xFF80D8FF), fontWeight = FontWeight.Bold, fontSize = (13 * scale).sp)
+                        Text("   Дошли до формы пароля: ${summary.adminFormReached}", color = Color.White.copy(alpha = 0.85f), fontSize = (12 * scale).sp)
+                        Text("   Попыток входа: ${summary.adminLoginAttempts} (успешных: ${summary.adminLoginSuccesses}, неудачных: ${summary.adminLoginFailures})", color = Color.White.copy(alpha = 0.85f), fontSize = (12 * scale).sp)
+                        if (summary.adminLoginsByIp.isNotEmpty()) {
+                            Text("   По IP:", color = Color.White.copy(alpha = 0.7f), fontSize = (12 * scale).sp)
+                            summary.adminLoginsByIp.entries.sortedByDescending { it.value }.forEach { (ip, count) ->
+                                Text("      $ip: $count", color = Color.White.copy(alpha = 0.7f), fontSize = (12 * scale).sp)
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp * scale))
+
+                        Text("Клиенты (${summary.clientStates.size})", color = Color(0xFF80D8FF), fontWeight = FontWeight.Bold, fontSize = (13 * scale).sp)
+                        summary.clientStates.sortedByDescending { it.updatedAt }.forEach { cs ->
+                            Text(
+                                "   ${cs.nickname ?: cs.clientId.take(8)} — RAM: ${cs.ramMb ?: "?"}МБ, JRE: ${cs.jreSource ?: "?"}, " +
+                                        "ассеты: ${cs.assetsSource ?: "?"}, рантайм: ${cs.runtimeId ?: "?"}",
+                                color = Color.White.copy(alpha = 0.85f), fontSize = (12 * scale).sp
+                            )
+                        }
+                        Spacer(Modifier.height(10.dp * scale))
+
+                        Text("История ников (${summary.nicknameHistory.size})", color = Color(0xFF80D8FF), fontWeight = FontWeight.Bold, fontSize = (13 * scale).sp)
+                        summary.nicknameHistory.forEach { (clientId, history) ->
+                            Text("   ${clientId.take(8)}: " + history.joinToString(" → ") { it.nickname }, color = Color.White.copy(alpha = 0.85f), fontSize = (12 * scale).sp)
                         }
                     }
                 }

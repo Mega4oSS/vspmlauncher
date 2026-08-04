@@ -14,6 +14,47 @@ data class NewsItemDto(
 )
 
 @Serializable
+data class ClientEventRequestDto(
+    val clientId: String,
+    val type: String,
+    val nickname: String? = null,
+    val ramMb: Int? = null,
+    val jreSource: String? = null,
+    val assetsSource: String? = null,
+    val runtimeId: String? = null,
+    val channel: String? = null,
+    val version: String? = null,
+    val extra: Map<String, String>? = null
+)
+
+@Serializable
+data class ClientStateSnapshotDto(
+    val clientId: String,
+    val updatedAt: Long,
+    val nickname: String? = null,
+    val ramMb: Int? = null,
+    val jreSource: String? = null,
+    val assetsSource: String? = null,
+    val runtimeId: String? = null
+)
+
+@Serializable
+data class NicknameEntryDto(val nickname: String, val firstSeenAt: Long, val lastSeenAt: Long)
+
+@Serializable
+data class AnalyticsSummaryDto(
+    val eventCounts: Map<String, Int>,
+    val uniqueClients: Int,
+    val adminFormReached: Int,
+    val adminLoginAttempts: Int,
+    val adminLoginSuccesses: Int,
+    val adminLoginFailures: Int,
+    val adminLoginsByIp: Map<String, Int>,
+    val clientStates: List<ClientStateSnapshotDto>,
+    val nicknameHistory: Map<String, List<NicknameEntryDto>>
+)
+
+@Serializable
 data class ServerStatusDto(
     val online: Boolean,
     val maintenance: Boolean,

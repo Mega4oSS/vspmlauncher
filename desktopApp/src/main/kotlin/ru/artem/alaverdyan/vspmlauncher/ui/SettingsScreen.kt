@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.artem.alaverdyan.vspmlauncher.data.LaunchBehavior
 import ru.artem.alaverdyan.vspmlauncher.data.TransparencyMode
+import ru.artem.alaverdyan.vspmlauncher.network.AnalyticsClient
 import ru.artem.alaverdyan.vspmlauncher.network.ClientModEntryDto
 import ru.artem.alaverdyan.vspmlauncher.runtime.PlatformInfo
 import ru.artem.alaverdyan.vspmlauncher.ui.components.AnimatedBackground
@@ -352,7 +353,7 @@ private fun ModsSection(
                 text = "Скачать с Modrinth",
                 selected = true,
                 scale = scale,
-                onClick = { showModrinthDialog = true }
+                onClick = { showModrinthDialog = true; AnalyticsClient.trackModrinthDialogOpened() }
             )
         }
     }

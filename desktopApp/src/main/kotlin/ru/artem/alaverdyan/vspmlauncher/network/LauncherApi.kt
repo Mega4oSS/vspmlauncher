@@ -58,6 +58,20 @@ object LauncherApi {
         }
     }
 
+    suspend fun sendEvent(req: ClientEventRequestDto) {
+        runCatching {
+            jsonClient.post("${LauncherConfig.BASE_URL}/api/v1/analytics/event") {
+                contentType(ContentType.Application.Json)
+                setBody(req)
+            }
+        }
+    }
+
+    suspend fun adminAnalytics(token: String): AnalyticsSummaryDto =
+        jsonClient.get("${LauncherConfig.BASE_URL}/api/v1/admin/analytics") {
+            header("X-Admin-Token", token)
+        }.body()
+
     suspend fun getRuntimes(): RuntimeManifestDto =
         jsonClient.get("${LauncherConfig.BASE_URL}/api/v1/runtimes").body()
 

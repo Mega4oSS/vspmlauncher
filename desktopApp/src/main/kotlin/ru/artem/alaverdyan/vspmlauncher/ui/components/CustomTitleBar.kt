@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
+import androidx.compose.material.LocalMinimumTouchTargetEnforcement
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.filled.CropSquare
 import androidx.compose.material.icons.filled.FilterNone
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,8 +34,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.unit.Dp
@@ -40,9 +43,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.WindowScope
 import ru.artem.alaverdyan.vspmlauncher.ui.theme.GlassConfig
-import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.LocalMinimumTouchTargetEnforcement
-import androidx.compose.runtime.CompositionLocalProvider
+import java.awt.MouseInfo
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterialApi::class, ExperimentalComposeUiApi::class)
 @Composable
@@ -50,6 +52,7 @@ fun WindowScope.CustomTitleBar(
     title: String,
     onMinimize: () -> Unit,
     onClose: () -> Unit,
+    onWindowMoved: () -> Unit = {},
     onMaximizeToggle: (() -> Unit)? = null,
     isMaximized: Boolean = false,
     onRestoreFromMaximizedDrag: ((targetX: Int, targetY: Int) -> Unit)? = null,
@@ -69,6 +72,9 @@ fun WindowScope.CustomTitleBar(
     val isMaximizedState = rememberUpdatedState(isMaximized)
     val restoreCallbackState = rememberUpdatedState(onRestoreFromMaximizedDrag)
     val restoredWidthState = rememberUpdatedState(restoredWidthPx)
+    val maximizeToggleState = rememberUpdatedState(onMaximizeToggle)
+
+    val dragThresholdPx = 4
 
     Row(
         modifier = modifier
@@ -80,35 +86,74 @@ fun WindowScope.CustomTitleBar(
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    val startedMaximized = isMaximizedState.value
-                    var didRestore = false
-                    val relX = down.position.x / window.width.coerceAtLeast(1)
+
+                    // Экранные координаты точки захвата — не зависят от перемещений окна
+                    val downScreen = MouseInfo.getPointerInfo()?.location
+                    val downScreenX = downScreen?.x ?: (window.x + down.position.x.toInt())
+                    val downScreenY = downScreen?.y ?: (window.y + down.position.y.toInt())
+
+                    val startWasMaximized = isMaximizedState.value
+                    val grabRelX = down.position.x / window.width.coerceAtLeast(1)
+                    val grabOffsetY = down.position.y.toInt()
+
+                    var restoredFromMaximize = false
+                    var dragging = false
+                    var offsetX = 0
+                    var offsetY = 0
 
                     do {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id }
-                            ?: event.changes.first()
+                            ?: event.changes.firstOrNull()
+                            ?: break
 
                         if (change.positionChanged()) {
-                            if (startedMaximized && !didRestore) {
-                                val screenX = window.x + change.position.x.toInt()
-                                val screenY = window.y + change.position.y.toInt()
-                                val width = restoredWidthState.value
+                            val screen = MouseInfo.getPointerInfo()?.location
 
-                                val targetX = (screenX - width * relX).toInt()
-                                val targetY = screenY - down.position.y.toInt()
+                            if (screen != null) {
+                                val dx = screen.x - downScreenX
+                                val dy = screen.y - downScreenY
 
-                                restoreCallbackState.value?.invoke(targetX, targetY)
-                                didRestore = true
-                            } else {
-                                window.setLocation(
-                                    window.x + change.position.x.toInt() - down.position.x.toInt(),
-                                    window.y + change.position.y.toInt() - down.position.y.toInt()
-                                )
+                                if (!dragging && (abs(dx) > dragThresholdPx || abs(dy) > dragThresholdPx)) {
+                                    dragging = true
+
+                                    if (startWasMaximized) {
+                                        val width = restoredWidthState.value
+                                        val targetX = (screen.x - width * grabRelX).toInt()
+                                        val targetY = screen.y - grabOffsetY
+
+                                        restoreCallbackState.value?.invoke(targetX, targetY)
+                                        restoredFromMaximize = true
+
+                                        // окно уже стоит там, где нужно — дальше просто следуем за курсором
+                                        offsetX = screen.x - targetX
+                                        offsetY = screen.y - targetY
+                                    } else {
+                                        offsetX = screen.x - window.x
+                                        offsetY = screen.y - window.y
+                                    }
+                                }
+
+                                if (dragging && (!startWasMaximized || restoredFromMaximize)) {
+                                    window.setLocation(screen.x - offsetX, screen.y - offsetY)
+                                }
                             }
+
                             change.consume()
                         }
                     } while (event.changes.any { it.pressed })
+
+                    if (!dragging) {
+                        val now = System.currentTimeMillis()
+                        if (now - lastClickTime < 300) {
+                            maximizeToggleState.value?.invoke()
+                            lastClickTime = 0L
+                        } else {
+                            lastClickTime = now
+                        }
+                    } else {
+                        onWindowMoved()
+                    }
                 }
             }
             .padding(horizontal = 12.dp),
@@ -118,17 +163,7 @@ fun WindowScope.CustomTitleBar(
         Text(
             text = title,
             color = Color.White.copy(alpha = 0.9f),
-            fontSize = 12.sp,
-            modifier = Modifier
-                .onPointerEvent(PointerEventType.Press) {
-                    val now = System.currentTimeMillis()
-                    if (now - lastClickTime < 300) {
-                        onMaximizeToggle?.invoke()
-                        lastClickTime = 0L
-                    } else {
-                        lastClickTime = now
-                    }
-                }
+            fontSize = 12.sp
         )
 
         CompositionLocalProvider(LocalMinimumTouchTargetEnforcement provides false) {

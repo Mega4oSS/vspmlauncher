@@ -17,9 +17,11 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import ru.artem.alaverdyan.vspmlauncher.data.NicknameStorage
 import ru.artem.alaverdyan.vspmlauncher.data.SettingsStorage
 import ru.artem.alaverdyan.vspmlauncher.data.TransparencyMode
 import ru.artem.alaverdyan.vspmlauncher.launch.LaunchResult
+import ru.artem.alaverdyan.vspmlauncher.network.AnalyticsClient
 import ru.artem.alaverdyan.vspmlauncher.runtime.PlatformInfo
 import ru.artem.alaverdyan.vspmlauncher.ui.App
 import ru.artem.alaverdyan.vspmlauncher.ui.ConsoleWindow
@@ -42,12 +44,13 @@ fun main() {
 }
 
 private fun launcherApp(decoratorEnabled: Boolean, useRealTransparency: Boolean) = application {
+    LaunchedEffect(Unit) { AnalyticsClient.trackAppOpen(NicknameStorage.load()) }
     var consoleLaunchResult by remember { mutableStateOf<LaunchResult?>(null) }
 
     val mainWindowState = rememberWindowState(width = 1000.dp, height = 650.dp)
 
     Window(
-        onCloseRequest = ::exitApplication,
+        onCloseRequest = { AnalyticsClient.trackAppClose(); exitApplication() },
         title = "ВСПМ 5 — Launcher",
         state = mainWindowState,
         resizable = true,
@@ -103,6 +106,7 @@ private fun launcherApp(decoratorEnabled: Boolean, useRealTransparency: Boolean)
                                     mainWindowState.placement = WindowPlacement.Maximized
                                 }
                             },
+                            onWindowMoved = { AnalyticsClient.trackWindowMoved() },
                             isMaximized = isMaximized,
                             onRestoreFromMaximizedDrag = { targetXPx, targetYPx ->
                                 mainWindowState.placement = WindowPlacement.Floating

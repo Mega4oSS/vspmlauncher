@@ -42,6 +42,7 @@ import ru.artem.alaverdyan.vspmlauncher.data.SettingsStorage
 import ru.artem.alaverdyan.vspmlauncher.launch.GameLauncher
 import ru.artem.alaverdyan.vspmlauncher.launch.LaunchParams
 import ru.artem.alaverdyan.vspmlauncher.launch.LaunchResult
+import ru.artem.alaverdyan.vspmlauncher.network.AnalyticsClient
 import ru.artem.alaverdyan.vspmlauncher.network.ClientModEntryDto
 import ru.artem.alaverdyan.vspmlauncher.network.LauncherApi
 import ru.artem.alaverdyan.vspmlauncher.network.LauncherConfig
@@ -138,6 +139,9 @@ fun App(
     var showAdminAuthDialog by remember { mutableStateOf(false) }
     var installDirPickerDeferred by remember { mutableStateOf<CompletableDeferred<File?>?>(null) }
 
+    val appStartAt = remember { System.currentTimeMillis() }
+    var firstLaunchTracked by remember { mutableStateOf(false) }
+
     suspend fun pickInstallDirectoryAsync(): File? {
         val deferred = CompletableDeferred<File?>()
         installDirPickerDeferred = deferred
@@ -147,6 +151,7 @@ fun App(
     var adminSessionToken by remember { mutableStateOf<String?>(null) }
 
     fun onLogoClicked() {
+        AnalyticsClient.trackLogoClick()
         val now = System.currentTimeMillis()
         logoClickCount = if (now - lastLogoClickAt <= LOGO_CLICK_WINDOW_MS) logoClickCount + 1 else 1
         lastLogoClickAt = now
@@ -288,6 +293,7 @@ fun App(
 
     fun launchGameAndWatch(javaBinary: File) {
         scope.launch {
+            val launchStartedAt = System.currentTimeMillis()
             val launchResult: LaunchResult = withContext(Dispatchers.IO) {
                 GameLauncher.launch(
                     LaunchParams(
@@ -300,6 +306,13 @@ fun App(
                 )
             }
             runningProcess = launchResult.process
+
+            if (!firstLaunchTracked) {
+                firstLaunchTracked = true
+                AnalyticsClient.trackGameLaunched(timeToFirstLaunchMs = System.currentTimeMillis() - appStartAt)
+            } else {
+                AnalyticsClient.trackGameLaunched()
+            }
 
             when (launchBehavior) {
                 LaunchBehavior.MINIMIZE -> onMinimize()
@@ -314,6 +327,10 @@ fun App(
 
             runningProcess = null
             onGameExited()
+            AnalyticsClient.trackGameExited(
+                durationMs = System.currentTimeMillis() - launchStartedAt,
+                exitCode = exitCode
+            )
 
             if (exitCode != 0) {
                 val tail = withContext(Dispatchers.IO) {
@@ -328,6 +345,17 @@ fun App(
         currentInstallDir().mkdirs()
         checkForUpdates()
         isLoading = false
+        AnalyticsClient.trackEnvironment()
+    }
+
+    LaunchedEffect(ramMb, runtimeId, jrePath, downloadJreFromOfficial, downloadMinecraftFromOfficial) {
+        val jreSource = when {
+            downloadJreFromOfficial -> "official"
+            jrePath.isNotBlank() -> "custom"
+            else -> "bundled:$runtimeId"
+        }
+        val assetsSource = if (downloadMinecraftFromOfficial) "official" else "backend"
+        AnalyticsClient.trackClientState(nickname, ramMb.toInt(), jreSource, assetsSource, runtimeId)
     }
 
     LaunchedEffect(Unit) {
@@ -423,8 +451,9 @@ fun App(
                             onConfirm = { entered ->
                                 NicknameStorage.save(entered)
                                 nickname = entered
+                                AnalyticsClient.trackNicknameChanged(entered)
                                 screen = Screen.Main
-                            }
+                            },
                         )
 
                         Screen.Main -> MainScreen(
@@ -449,11 +478,11 @@ fun App(
                                     launchError = null
                                     try {
                                         if (needsUpdate) {
+                                            val wasFirstInstall = !hasExistingInstall   // фиксируем ДО апдейта состояния
+
                                             if (!hasExistingInstall) {
                                                 val chosen = pickInstallDirectoryAsync()
-                                                if (chosen == null) {
-                                                    return@launch
-                                                }
+                                                if (chosen == null) return@launch
                                                 installBaseDir = chosen.absolutePath
                                                 SettingsStorage.saveInstallDir(installBaseDir)
                                                 currentInstallDir().mkdirs()
@@ -461,15 +490,15 @@ fun App(
 
                                             val allConflicts = mutableListOf<ConflictInfo>()
                                             pendingPlans.filter { !it.upToDate }.forEach { plan ->
-                                                val planConflicts =
-                                                    UpdatePlanExecutor.apply(currentInstallDir(), plan) { progress ->
-                                                        downloadProgress = progress
-                                                    }
+                                                val planConflicts = UpdatePlanExecutor.apply(currentInstallDir(), plan) { progress ->
+                                                    downloadProgress = progress
+                                                }
                                                 allConflicts += planConflicts
+
+                                                if (wasFirstInstall) AnalyticsClient.trackDownloadCompleted(plan.channel, plan.toVersion)
+                                                else AnalyticsClient.trackUpdateCompleted(plan.channel, plan.toVersion)
                                             }
-                                            if (modsNeedSync) {
-                                                applyModsSync()
-                                            }
+                                            if (modsNeedSync) applyModsSync()
                                             downloadProgress = null
                                             conflicts = allConflicts
 
@@ -502,7 +531,8 @@ fun App(
                                     }
                                 }
                             },
-                            onOpenSettings = { screen = Screen.Settings },
+                            onShipClick = { AnalyticsClient.trackShipClick() },
+                            onOpenSettings = { screen = Screen.Settings; AnalyticsClient.trackSettingsOpened() },
                             onLogoClick = { onLogoClicked() }
                         )
 

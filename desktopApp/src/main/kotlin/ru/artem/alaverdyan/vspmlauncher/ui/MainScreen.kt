@@ -43,6 +43,7 @@ fun MainScreen(
     onDismissLaunchError: () -> Unit,
     onLaunchOrUpdate: () -> Unit,
     onCloseGame: () -> Unit,
+    onShipClick: () -> Unit,
     onOpenSettings: () -> Unit,
     onLogoClick: () -> Unit
 ) {
@@ -81,6 +82,11 @@ fun MainScreen(
                 .padding(start = edgePadding, bottom = edgePadding)
                 .width(shipSize)
                 .aspectRatio(1.78f)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onShipClick
+                )
         )
 
         Column(
