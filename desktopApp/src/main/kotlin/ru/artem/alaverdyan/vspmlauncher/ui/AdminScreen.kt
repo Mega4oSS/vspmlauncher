@@ -351,7 +351,8 @@ fun AdminScreen(sessionToken: String, onBack: () -> Unit) {
                                     try {
                                         analytics = LauncherApi.adminAnalytics(sessionToken)
                                     } catch (e: Exception) {
-                                        analyticsError = "Не удалось загрузить статистику"
+                                        System.out.println(e.message)
+                                        analyticsError = "Ошибка: ${e.message}"
                                     }
                                     isAnalyticsBusy = false
                                 }
@@ -374,6 +375,7 @@ fun AdminScreen(sessionToken: String, onBack: () -> Unit) {
                         Text("Уникальных клиентов: ${summary.uniqueClients}", color = Color.White, fontSize = (13 * scale).sp)
                         Spacer(Modifier.height(10.dp * scale))
 
+                        // --- События ---
                         Text("События", color = Color(0xFF80D8FF), fontWeight = FontWeight.Bold, fontSize = (13 * scale).sp)
                         if (summary.eventCounts.isEmpty()) {
                             Text("Нет данных", color = Color.White.copy(alpha = 0.5f), fontSize = (12 * scale).sp)
@@ -384,6 +386,7 @@ fun AdminScreen(sessionToken: String, onBack: () -> Unit) {
                         }
                         Spacer(Modifier.height(10.dp * scale))
 
+                        // --- Админ-панель ---
                         Text("Админ-панель", color = Color(0xFF80D8FF), fontWeight = FontWeight.Bold, fontSize = (13 * scale).sp)
                         Text("   Дошли до формы пароля: ${summary.adminFormReached}", color = Color.White.copy(alpha = 0.85f), fontSize = (12 * scale).sp)
                         Text("   Попыток входа: ${summary.adminLoginAttempts} (успешных: ${summary.adminLoginSuccesses}, неудачных: ${summary.adminLoginFailures})", color = Color.White.copy(alpha = 0.85f), fontSize = (12 * scale).sp)
@@ -395,6 +398,57 @@ fun AdminScreen(sessionToken: String, onBack: () -> Unit) {
                         }
                         Spacer(Modifier.height(10.dp * scale))
 
+                        // --- Загрузки/обновления ---
+                        Text("Загрузки/обновления", color = Color(0xFF80D8FF), fontWeight = FontWeight.Bold, fontSize = (13 * scale).sp)
+                        if (summary.downloadsByVersion.isEmpty() && summary.updatesByVersion.isEmpty()) {
+                            Text("Нет данных", color = Color.White.copy(alpha = 0.5f), fontSize = (12 * scale).sp)
+                        } else {
+                            Text("   Скачивания:", color = Color.White.copy(alpha = 0.7f), fontSize = (12 * scale).sp)
+                            summary.downloadsByVersion.entries.sortedByDescending { it.value }.forEach { (v, c) ->
+                                Text("      $v: $c", color = Color.White.copy(alpha = 0.85f), fontSize = (12 * scale).sp)
+                            }
+                            Text("   Обновления:", color = Color.White.copy(alpha = 0.7f), fontSize = (12 * scale).sp)
+                            summary.updatesByVersion.entries.sortedByDescending { it.value }.forEach { (v, c) ->
+                                Text("      $v: $c", color = Color.White.copy(alpha = 0.85f), fontSize = (12 * scale).sp)
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp * scale))
+
+                        // --- Игровые сессии ---
+                        Text("Игровые сессии", color = Color(0xFF80D8FF), fontWeight = FontWeight.Bold, fontSize = (13 * scale).sp)
+                        Text(
+                            "   Средняя длительность: ${summary.avgSessionDurationMs?.let { "${it / 1000}с" } ?: "нет данных"}",
+                            color = Color.White.copy(alpha = 0.85f), fontSize = (12 * scale).sp
+                        )
+                        Text(
+                            "   Среднее время до первого запуска: ${summary.avgTimeToFirstLaunchMs?.let { "${it}мс" } ?: "нет данных"}",
+                            color = Color.White.copy(alpha = 0.85f), fontSize = (12 * scale).sp
+                        )
+                        if (summary.exitCodeCounts.isNotEmpty()) {
+                            Text("   Коды выхода:", color = Color.White.copy(alpha = 0.7f), fontSize = (12 * scale).sp)
+                            summary.exitCodeCounts.entries.sortedByDescending { it.value }.forEach { (code, count) ->
+                                Text("      $code: $count", color = Color.White.copy(alpha = 0.85f), fontSize = (12 * scale).sp)
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp * scale))
+
+                        // --- Окружение (агрегировано) ---
+                        Text("Окружение клиентов", color = Color(0xFF80D8FF), fontWeight = FontWeight.Bold, fontSize = (13 * scale).sp)
+                        if (summary.osBreakdown.isEmpty()) {
+                            Text("Нет данных", color = Color.White.copy(alpha = 0.5f), fontSize = (12 * scale).sp)
+                        } else {
+                            Text("   ОС:", color = Color.White.copy(alpha = 0.7f), fontSize = (12 * scale).sp)
+                            summary.osBreakdown.entries.sortedByDescending { it.value }.forEach { (os, c) ->
+                                Text("      $os: $c", color = Color.White.copy(alpha = 0.85f), fontSize = (12 * scale).sp)
+                            }
+                            Text("   Версии лаунчера:", color = Color.White.copy(alpha = 0.7f), fontSize = (12 * scale).sp)
+                            summary.launcherVersionBreakdown.entries.sortedByDescending { it.value }.forEach { (v, c) ->
+                                Text("      $v: $c", color = Color.White.copy(alpha = 0.85f), fontSize = (12 * scale).sp)
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp * scale))
+
+                        // --- Клиенты (детально, с железом) ---
                         Text("Клиенты (${summary.clientStates.size})", color = Color(0xFF80D8FF), fontWeight = FontWeight.Bold, fontSize = (13 * scale).sp)
                         summary.clientStates.sortedByDescending { it.updatedAt }.forEach { cs ->
                             Text(
@@ -402,9 +456,25 @@ fun AdminScreen(sessionToken: String, onBack: () -> Unit) {
                                         "ассеты: ${cs.assetsSource ?: "?"}, рантайм: ${cs.runtimeId ?: "?"}",
                                 color = Color.White.copy(alpha = 0.85f), fontSize = (12 * scale).sp
                             )
+                            Text(
+                                "      ОС: ${cs.os ?: "?"} ${cs.osVersion ?: ""} (${cs.arch ?: "?"}), " +
+                                        "лаунчер: ${cs.launcherVersion ?: "?"} / Java ${cs.launcherJavaVersion ?: "?"}",
+                                color = Color.White.copy(alpha = 0.6f), fontSize = (11 * scale).sp
+                            )
+                            Text(
+                                "      CPU: ${cs.cpuModel ?: "?"} (${cs.cpuCores ?: "?"} ядер), GPU: ${cs.gpuModel ?: "?"}, " +
+                                        "RAM всего: ${cs.ramTotalMb ?: "?"}МБ",
+                                color = Color.White.copy(alpha = 0.6f), fontSize = (11 * scale).sp
+                            )
+                            Text(
+                                "      Экран: ${cs.screenWidth ?: "?"}×${cs.screenHeight ?: "?"} @ dpi ${cs.dpiScale ?: "?"}",
+                                color = Color.White.copy(alpha = 0.6f), fontSize = (11 * scale).sp
+                            )
+                            Spacer(Modifier.height(4.dp * scale))
                         }
                         Spacer(Modifier.height(10.dp * scale))
 
+                        // --- История ников ---
                         Text("История ников (${summary.nicknameHistory.size})", color = Color(0xFF80D8FF), fontWeight = FontWeight.Bold, fontSize = (13 * scale).sp)
                         summary.nicknameHistory.forEach { (clientId, history) ->
                             Text("   ${clientId.take(8)}: " + history.joinToString(" → ") { it.nickname }, color = Color.White.copy(alpha = 0.85f), fontSize = (12 * scale).sp)

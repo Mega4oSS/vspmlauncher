@@ -35,7 +35,20 @@ data class ClientStateSnapshotDto(
     val ramMb: Int? = null,
     val jreSource: String? = null,
     val assetsSource: String? = null,
-    val runtimeId: String? = null
+    val runtimeId: String? = null,
+    // --- железо/окружение ---
+    val os: String? = null,
+    val osVersion: String? = null,
+    val arch: String? = null,
+    val launcherVersion: String? = null,
+    val launcherJavaVersion: String? = null,
+    val cpuModel: String? = null,
+    val cpuCores: Int? = null,
+    val gpuModel: String? = null,
+    val ramTotalMb: Long? = null,
+    val screenWidth: Int? = null,
+    val screenHeight: Int? = null,
+    val dpiScale: Double? = null
 )
 
 @Serializable
@@ -51,7 +64,15 @@ data class AnalyticsSummaryDto(
     val adminLoginFailures: Int,
     val adminLoginsByIp: Map<String, Int>,
     val clientStates: List<ClientStateSnapshotDto>,
-    val nicknameHistory: Map<String, List<NicknameEntryDto>>
+    val nicknameHistory: Map<String, List<NicknameEntryDto>>,
+    // --- новое ---
+    val downloadsByVersion: Map<String, Int>,
+    val updatesByVersion: Map<String, Int>,
+    val avgSessionDurationMs: Long? = null,
+    val exitCodeCounts: Map<String, Int>,
+    val avgTimeToFirstLaunchMs: Long? = null,
+    val osBreakdown: Map<String, Int>,
+    val launcherVersionBreakdown: Map<String, Int>
 )
 
 @Serializable
