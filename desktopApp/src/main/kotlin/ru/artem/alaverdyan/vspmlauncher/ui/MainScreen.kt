@@ -44,9 +44,7 @@ fun MainScreen(
     onLaunchOrUpdate: () -> Unit,
     onCloseGame: () -> Unit,
     onOpenSettings: () -> Unit,
-    onLogoClick: () -> Unit,
-    onClose: () -> Unit,
-    onMinimize: () -> Unit
+    onLogoClick: () -> Unit
 ) {
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -78,7 +76,6 @@ fun MainScreen(
         )
 
         AnimatedShip(
-            imageResPath = "images/ship.png",
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(start = edgePadding, bottom = edgePadding)
@@ -147,8 +144,6 @@ fun MainScreen(
             }
         }
 
-        // Баннер ошибки запуска — левый нижний угол, отдельно от правой панели,
-        // побольше и адаптивный под ширину окна.
         if (launchError != null) {
             val clipboardManager = LocalClipboardManager.current
             var justCopied by remember(launchError) { mutableStateOf(false) }

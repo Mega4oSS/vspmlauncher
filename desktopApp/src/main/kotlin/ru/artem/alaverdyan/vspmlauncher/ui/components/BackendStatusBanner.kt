@@ -16,12 +16,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.artem.alaverdyan.vspmlauncher.ui.BackendStatus
 
-/**
- * Жёлтая/красная стеклянная плашка между NewsWidget и панелью версии/кнопки.
- * Жёлтая — техработы на сервере (сервер отвечает, но maintenance=true).
- * Красная — бэкенд вообще недоступен (сетевая ошибка/таймаут).
- * При Ok ничего не рендерит.
- */
 @Composable
 fun BackendStatusBanner(
     status: BackendStatus,

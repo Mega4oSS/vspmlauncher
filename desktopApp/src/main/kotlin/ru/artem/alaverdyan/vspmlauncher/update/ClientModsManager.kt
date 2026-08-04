@@ -3,8 +3,6 @@ package ru.artem.alaverdyan.vspmlauncher.update
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import ru.artem.alaverdyan.vspmlauncher.data.AppPaths
 import ru.artem.alaverdyan.vspmlauncher.data.CLIENT_MODS_DIR
@@ -19,15 +17,8 @@ import io.ktor.utils.io.readAvailable
 import java.io.File
 import java.security.MessageDigest
 
-/**
- * CLIENT_MODS_DIR = game/mods — та же папка, куда UpdatePlanExecutor кладёт ОБЫЧНЫЕ моды
- * сборки (из манифеста канала). Поэтому нельзя просто сканировать директорию и показывать
- * "всё, что не помечено как серверное" — так туда попадают и моды сборки. Единственный
- * надёжный способ отличить "наши" файлы (локально добавленные / включённые тоглом) —
- * явный реестр: мы никогда не считаем файл своим, если сами его не регистрировали.
- */
 @Serializable
-private data class LocalEntry(val fileName: String, val source: String) // "LOCAL_FILE" | "MODRINTH"
+private data class LocalEntry(val fileName: String, val source: String)
 
 @Serializable
 private data class ServerEntry(val fileName: String, val sha256: String)
@@ -35,7 +26,7 @@ private data class ServerEntry(val fileName: String, val sha256: String)
 @Serializable
 private data class ManagedState(
     val local: MutableList<LocalEntry> = mutableListOf(),
-    val server: MutableMap<String, ServerEntry> = mutableMapOf() // key = ClientModEntryDto.id
+    val server: MutableMap<String, ServerEntry> = mutableMapOf()
 )
 
 private val STATE_FILE: File get() = AppPaths.clientModsStateFile()
@@ -43,7 +34,7 @@ private val STATE_FILE: File get() = AppPaths.clientModsStateFile()
 data class ClientModsSyncResult(
     val installed: List<String> = emptyList(),
     val removed: List<String> = emptyList(),
-    val failed: List<Pair<String, String>> = emptyList() // (имя мода, текст ошибки)
+    val failed: List<Pair<String, String>> = emptyList()
 ) {
     val hasFailures get() = failed.isNotEmpty()
 }
@@ -61,15 +52,13 @@ object ClientModsManager {
         STATE_FILE.writeText(json.encodeToString(state))
     }
 
-    // Только то, что реально зарегистрировано нами (addFromLocalFile/addFromModrinth) —
-    // НЕ скан директории, иначе сюда попадают обычные моды сборки из game/mods.
     fun listInstalled(): List<LocalClientMod> {
         val state = loadState()
         var changed = false
         val result = state.local.mapNotNull { entry ->
             val jar = File(CLIENT_MODS_DIR, entry.fileName)
             if (!jar.exists()) {
-                changed = true // файл исчез (удалили руками) — подчищаем реестр заодно
+                changed = true
                 return@mapNotNull null
             }
             toLocalMod(jar).copy(
@@ -123,33 +112,21 @@ object ClientModsManager {
         saveState(state)
     }
 
-    // Дешёвая проверка "изменилось ли что-то" — БЕЗ сети и без записи на диск. Нужна, чтобы
-    // решить, показывать ли кнопку "Обновить" вместо "Запуск", сразу по клику на чекбокс,
-    // а не только после реальной докачки/удаления.
     suspend fun hasPendingChanges(serverMods: List<ClientModEntryDto>, enabledModIds: Set<String>): Boolean =
         withContext(Dispatchers.IO) {
             val state = loadState()
             val required = serverMods.filter { it.id in enabledModIds }
             val requiredIds = required.map { it.id }.toSet()
 
-            // что-то включённое раньше и скачанное — теперь должно быть удалено
             if (state.server.keys.any { it !in requiredIds }) return@withContext true
 
-            // что-то включённое сейчас — ещё не скачано или скачано не то (устарел sha256)
             required.any { mod ->
                 val current = state.server[mod.id]
                 current == null || current.sha256 != mod.sha256 || !File(CLIENT_MODS_DIR, mod.fileName).exists()
             }
         }
 
-    /**
-     * Качает недостающие включённые моды, удаляет выключенные. В отличие от прошлой версии —
-     * НЕ падает целиком, если один мод не скачался: каждый обрабатывается независимо,
-     * ошибки собираются и возвращаются вызывающему (чтобы показать в UI, а не в /dev/null).
-     *
-     * Вызывать ТОЛЬКО из явного шага "Обновить" (см. App.kt onLaunchOrUpdate) — сама sync()
-     * больше не решает, когда её пора звать, это делает hasPendingChanges() + кнопка.
-     */
+
     suspend fun sync(
         serverMods: List<ClientModEntryDto>,
         enabledModIds: Set<String>,
@@ -162,7 +139,6 @@ object ClientModsManager {
             val installed = mutableListOf<String>()
             val failed = mutableListOf<Pair<String, String>>()
 
-            // 1. Выключенные (или пропавшие с сервера) — удаляем физически
             val toRemove = state.server.keys.filter { it !in enabledModIds || serverMods.none { m -> m.id == it } }
             toRemove.forEach { id ->
                 state.server.remove(id)?.let { entry ->
@@ -171,7 +147,6 @@ object ClientModsManager {
                 }
             }
 
-            // 2. Включённые — докачиваем по одному, ошибка одного не блокирует остальные
             val toInstall = serverMods.filter { it.id in enabledModIds }
             val pending = toInstall.filter { mod ->
                 val target = File(CLIENT_MODS_DIR, mod.fileName)
@@ -186,7 +161,7 @@ object ClientModsManager {
 
                 runCatching {
                     if (current != null && current.fileName != mod.fileName) {
-                        File(CLIENT_MODS_DIR, current.fileName).delete() // сервер переименовал файл
+                        File(CLIENT_MODS_DIR, current.fileName).delete()
                     }
                     withRetry("скачивание клиентского мода ${mod.fileName}") {
                         LauncherApi.downloadClient.prepareGet(LauncherApi.resolveUrl(mod.url)).execute { response ->
@@ -220,7 +195,7 @@ object ClientModsManager {
                     state.server[mod.id] = ServerEntry(fileName = mod.fileName, sha256 = mod.sha256)
                     installed += mod.fileName
                 }.onFailure { e ->
-                    target.delete() // не оставляем битый недокачанный файл
+                    target.delete()
                     failed += (mod.name to (e.message ?: e.toString()))
                 }
             }

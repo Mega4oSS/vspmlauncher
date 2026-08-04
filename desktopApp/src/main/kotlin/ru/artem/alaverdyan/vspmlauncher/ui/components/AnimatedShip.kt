@@ -27,7 +27,6 @@ import kotlin.random.Random
 
 @Composable
 fun AnimatedShip(
-    imageResPath: String,
     modifier: Modifier = Modifier,
     entryOffsetX: Dp = 260.dp,
     entryOffsetY: Dp = 50.dp,
@@ -41,7 +40,6 @@ fun AnimatedShip(
 ) {
     val density = LocalDensity.current
 
-    // --- Фаза 1: влёт на место ---
     val entryProgress = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         entryProgress.animateTo(
@@ -50,7 +48,6 @@ fun AnimatedShip(
         )
     }
 
-    // --- Фаза 2: покачивание носа — считаем время через кадры ---
     var bobTimeMs by remember { mutableStateOf(0L) }
     LaunchedEffect(Unit) {
         var startTime = -1L
@@ -62,7 +59,6 @@ fun AnimatedShip(
         }
     }
 
-    // --- Фаза 3a: случайные толчки по X (только вправо) ---
     val kickX = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -73,7 +69,6 @@ fun AnimatedShip(
         }
     }
 
-    // --- Фаза 3b: случайные толчки по Y (вверх/вниз) ---
     val kickY = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -88,14 +83,13 @@ fun AnimatedShip(
     val entryOffsetYPx = with(density) { entryOffsetY.toPx() }
 
     Image(
-        painter = painterResource(imageResPath),
+        painter = painterResource("images/ship.png"),
         contentDescription = "Корабль",
         contentScale = ContentScale.Fit,
         modifier = modifier
             .graphicsLayer {
                 val eased = 1f - entryProgress.value
 
-                // Влёт слева-снизу: X стартует левее финальной позиции, Y — ниже
                 translationX = -eased * entryOffsetXPx + kickX.value
                 translationY = eased * entryOffsetYPx + kickY.value
 

@@ -21,7 +21,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -30,12 +29,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.SharedFlow
 import ru.artem.alaverdyan.vspmlauncher.ui.components.AnimatedBackground
 
-/**
- * Отдельное окно консоли игры. Живёт независимо от процесса игры —
- * закрытие/сворачивание игры не должно закрывать это окно (см. вызывающий
- * код: Window для консоли не должен быть дочерним/условным от launchResult).
- */
-
+@Suppress("unused")
 private enum class LogLevel(val color: Color) {
     DEBUG(Color(0xFF8A8F98)),
     INFO(Color(0xFFB9F6CA)),
@@ -72,8 +66,6 @@ fun ConsoleWindow(
         }
     }
 
-    // Автоскролл только если пользователь и так был внизу списка —
-    // не выдёргиваем его, если он проскроллил вверх почитать лог.
     LaunchedEffect(lines.size) {
         if (autoScroll && lines.isNotEmpty()) {
             listState.animateScrollToItem(lines.size - 1)

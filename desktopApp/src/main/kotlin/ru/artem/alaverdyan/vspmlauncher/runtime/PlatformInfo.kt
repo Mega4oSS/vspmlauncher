@@ -1,5 +1,6 @@
 package ru.artem.alaverdyan.vspmlauncher.runtime
 
+@Suppress("unused")
 object PlatformInfo {
     val os: String by lazy {
         val name = System.getProperty("os.name").lowercase()

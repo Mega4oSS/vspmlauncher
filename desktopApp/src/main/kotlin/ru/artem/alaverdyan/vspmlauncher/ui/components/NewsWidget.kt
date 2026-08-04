@@ -17,10 +17,6 @@ import androidx.compose.ui.unit.sp
 
 data class NewsItem(val title: String, val body: String)
 
-/**
- * Полупрозрачный стеклянный виджет новостей сервера.
- */
-// NewsWidget.kt — принимает scale, масштабирует все шрифты и отступы
 @Composable
 fun NewsWidget(
     news: List<NewsItem>,

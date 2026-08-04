@@ -57,7 +57,7 @@ object GameLauncher {
             "classpath_separator" to if (System.getProperty("os.name").lowercase().contains("win")) ";" else ":"
         )
 
-        fun substitute(t: String) = placeholders.entries.fold(t) { acc, (k, v) -> acc.replace("\${$k}", v) }
+        fun substitute(t: String) = placeholders.entries.fold(t) { acc, (k, v) -> acc.replace($$"${$$k}", v) }
 
         val command = mutableListOf<String>().apply {
             add(params.javaBinary.absolutePath)
@@ -76,7 +76,6 @@ object GameLauncher {
         val stamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss").format(Date())
         val logFile = File(logsDir, "launch_$stamp.log")
 
-        // ДЕБАГ: полная команда запуска — искать неподставленные ${...}
         File(logsDir, "last_command_$stamp.txt").writeText(command.joinToString("\n"))
 
         val process = ProcessBuilder(command)

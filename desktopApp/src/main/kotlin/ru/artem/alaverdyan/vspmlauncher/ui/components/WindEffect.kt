@@ -18,32 +18,17 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 private data class WindParticle(
-    val lane: Float,      // 0..1, позиция в "полосе" перпендикулярно направлению полёта
-    val phase: Float,     // 0..1, фазовый сдвиг по времени, чтобы частицы не летели синхронно
-    val length: Float,    // длина полоски-частицы
-    val alpha: Float,     // индивидуальная прозрачность
+    val lane: Float,
+    val phase: Float,
+    val length: Float,
+    val alpha: Float,
     val strokeWidth: Float
 )
 
-/**
- * Летящие линии, имитирующие эффект ветра/скорости.
- *
- * Направление задаётся углом в градусах: 0° = строго слева направо,
- * отрицательные значения — снизу-слева вверх-направо (по умолчанию -20°),
- * положительные — сверху-слева вниз-направо. Крути [angleDegrees], чтобы поменять направление.
- *
- * @param angleDegrees угол направления полёта частиц
- * @param particleCount количество частиц
- * @param speed множитель скорости движения
- * @param minLength / maxLength диапазон длины линий
- * @param color базовый цвет частиц (обычно полупрозрачный белый)
- */
 @Composable
 fun WindEffect(
     modifier: Modifier = Modifier,
     angleDegrees: Float = -20f,
-    particleCount: Int = 50,
-    speed: Float = 1.2f,
     minLength: Float = 50f,
     maxLength: Float = 160f,
     color: Color = Color.White.copy(alpha = 0.35f)
@@ -53,13 +38,13 @@ fun WindEffect(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = (5000 / speed).toInt().coerceAtLeast(500), easing = LinearEasing)
+            animation = tween(durationMillis = (5000 / 1.4f).toInt().coerceAtLeast(500), easing = LinearEasing)
         ),
         label = "windProgress"
     )
 
-    val particles = remember(particleCount, minLength, maxLength) {
-        List(particleCount) {
+    val particles = remember(60, minLength, maxLength) {
+        List(60) {
             WindParticle(
                 lane = Random.nextFloat(),
                 phase = Random.nextFloat(),
@@ -73,21 +58,17 @@ fun WindEffect(
     val angleRad = Math.toRadians(angleDegrees.toDouble())
     val dirX = cos(angleRad).toFloat()
     val dirY = sin(angleRad).toFloat()
-    // перпендикуляр к направлению движения — используется, чтобы "рассеять" частицы по полосе
     val perpX = -dirY
     val perpY = dirX
 
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
-        val travelDistance = w + h // с запасом, чтобы частицы гарантированно пересекали весь экран
+        val travelDistance = w + h
 
         particles.forEach { p ->
             val t = (progress + p.phase) % 1f
             val distance = t * travelDistance
-
-            // стартовая точка: за пределами экрана "позади" по направлению движения,
-            // разбросана по перпендикулярной оси согласно lane
             val startX = w * 0.5f - dirX * travelDistance * 0.6f + perpX * (p.lane - 0.5f) * travelDistance
             val startY = h * 0.5f - dirY * travelDistance * 0.6f + perpY * (p.lane - 0.5f) * travelDistance
 

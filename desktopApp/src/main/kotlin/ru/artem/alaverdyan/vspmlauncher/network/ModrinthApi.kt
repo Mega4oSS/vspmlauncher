@@ -14,8 +14,6 @@ private const val MODRINTH_BASE = "https://api.modrinth.com/v2"
 
 object ModrinthApi {
 
-    // null — сетевая ошибка / Modrinth недоступен у части пользователей; UI должен отличать
-    // это от "ничего не найдено".
     suspend fun search(query: String, category: String? = null): ModrinthSearchResponseDto? = runCatching {
         val facetGroups = mutableListOf("""["project_type:mod"]""")
         if (category != null) facetGroups += """["categories:$category"]"""

@@ -19,12 +19,12 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.Json
-import ru.artem.alaverdyan.vspmlauncher.runtime.PlatformInfo
 import java.security.MessageDigest
 
 object LauncherConfig {
     const val BASE_URL = "http://168.222.203.250:8080"
     //const val BASE_URL = "http://0.0.0.0:8080"
+
     const val MINECRAFT_VERSION = "1.21.1"
 
     val GAME_CHANNELS: List<String> = listOf(
@@ -45,7 +45,6 @@ object LauncherApi {
         }
     }
 
-    // ← движок сменён с CIO на OkHttp — устраняет класс гонок keep-alive пула
     val downloadClient = HttpClient(OkHttp) {
         engine {
             config {
@@ -74,10 +73,15 @@ object LauncherApi {
     suspend fun getClientMods(): ClientModsManifestDto =
         jsonClient.get("${LauncherConfig.BASE_URL}/api/v1/client-mods").body()
 
-    suspend fun getManifests(
-        channels: List<String> = LauncherConfig.GAME_CHANNELS
-    ): List<ManifestDto> = coroutineScope {
-        channels.map { channel -> async { getManifest(channel) } }.awaitAll()
+    suspend fun adminSetMaintenance(token: String, maintenance: Boolean, message: String?): Pair<Boolean, String> {
+        val response = jsonClient.post("${LauncherConfig.BASE_URL}/api/v1/admin/status") {
+            header("X-Admin-Token", token)
+            contentType(ContentType.Application.Json)
+            setBody(AdminMaintenanceRequestDto(maintenance, message?.takeIf { it.isNotBlank() }))
+        }
+        val ok = response.status.value in 200..299
+        val text = if (ok) (if (maintenance) "Тех. работы включены" else "Тех. работы выключены") else response.bodyAsText()
+        return ok to text
     }
 
     suspend fun getUpdatePlan(channel: String, fromVersion: String?): UpdatePlanDto? {
@@ -113,15 +117,12 @@ object LauncherApi {
         if (relativeOrAbsoluteUrl.startsWith("http")) relativeOrAbsoluteUrl
         else "${LauncherConfig.BASE_URL}$relativeOrAbsoluteUrl"
 
-    // --- Admin (защищённая панель публикации сборок) ---
 
     private fun sha256Hex(text: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(text.toByteArray())
         return digest.joinToString("") { "%02x".format(it) }
     }
 
-    // Пароль на сервер уходит в виде sha256 — сервер никогда не видит его в открытом виде.
-    // Это НЕ замена HTTPS: без TLS хеш, попавший в чужие руки, работает как сам пароль.
     suspend fun adminAuth(password: String): AdminAuthResponseDto =
         jsonClient.post("${LauncherConfig.BASE_URL}/api/v1/admin/auth") {
             contentType(ContentType.Application.Json)
@@ -140,7 +141,6 @@ object LauncherApi {
         }.body()
     }
 
-    // Возвращает (успех, сообщение) — на успехе сообщение можно игнорировать и просто перечитать versions/diff.
     suspend fun adminPublish(token: String, channel: String, version: String): Pair<Boolean, String> {
         val response = jsonClient.post("${LauncherConfig.BASE_URL}/api/v1/admin/publish/$channel") {
             header("X-Admin-Token", token)

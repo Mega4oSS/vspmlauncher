@@ -1,6 +1,6 @@
 package ru.artem.alaverdyan.vspmlauncher.update
 
-enum class ProgressPhase { DOWNLOADING, CLEANING, RUNTIME, MODS, VERIFYING }
+enum class ProgressPhase { DOWNLOADING, CLEANING, RUNTIME, MODS, VERIFYING, MOVING }
 
 data class DownloadProgress(
     val phase: ProgressPhase = ProgressPhase.DOWNLOADING,

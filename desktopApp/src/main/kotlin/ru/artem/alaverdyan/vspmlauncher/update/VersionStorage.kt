@@ -1,18 +1,13 @@
 package ru.artem.alaverdyan.vspmlauncher.update
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 
 @Serializable
 private data class InstalledVersions(val versions: Map<String, String> = emptyMap())
 
-/**
- * Хранит installDir/.launcher/versions.json — какая версия каждого канала сейчас установлена.
- * Это и есть новый триггер "нужно обновление": не хэши файлов на диске, а сравнение
- * этой версии с последней версией на бэкенде.
- */
+@Suppress("unused")
 object VersionStorage {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -23,7 +18,7 @@ object VersionStorage {
         if (!f.exists()) return emptyMap()
         return try {
             json.decodeFromString<InstalledVersions>(f.readText()).versions
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             emptyMap()
         }
     }

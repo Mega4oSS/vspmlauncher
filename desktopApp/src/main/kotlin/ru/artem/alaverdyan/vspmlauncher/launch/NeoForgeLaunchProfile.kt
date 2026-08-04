@@ -7,7 +7,7 @@ data class NeoForgeLaunchProfile(
     val mainClass: String,
     val jvmArgTemplates: List<String>,
     val gameArgTemplates: List<String>,
-    val libraryPaths: List<String> // относительные пути внутри libraries/, из merged version.json
+    val libraryPaths: List<String>
 )
 
 object NeoForgeLaunchProfileReader {
@@ -42,8 +42,6 @@ object NeoForgeLaunchProfileReader {
         val jvmArgs = parentJvmArgs + (argumentsObj?.get("jvm")?.jsonArray?.let { flattenArgs(it) } ?: emptyList())
         val gameArgs = parentGameArgs + (argumentsObj?.get("game")?.jsonArray?.let { flattenArgs(it) } ?: emptyList())
 
-        // дедуп по artifact-координате (group:artifact) — оставляем последнее вхождение
-        // (дочерний NeoForge-профиль переопределяет версию, если совпадает с родительской)
         val dedupedPaths = LinkedHashMap<String, String>()
         libraryPaths.forEach { path ->
             dedupedPaths[dedupKey(path)] = path

@@ -5,12 +5,6 @@ import kotlinx.coroutines.delay
 private const val MAX_RETRIES = 3
 private const val RETRY_BASE_DELAY_MS = 1000L
 
-/**
- * Повторяет suspend-блок при исключении с растущей задержкой (1с, 2с, 3с).
- * Нужен для устойчивости к единичным сетевым заминкам во время долгих
- * последовательных закачек — один моргнувший коннект не должен ронять
- * весь процесс установки/обновления.
- */
 suspend fun <T> withRetry(
     description: String,
     block: suspend () -> T

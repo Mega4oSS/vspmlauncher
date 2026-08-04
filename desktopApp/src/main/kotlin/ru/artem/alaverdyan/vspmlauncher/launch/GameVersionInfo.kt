@@ -1,9 +1,12 @@
+@file:Suppress("unused")
+
 package ru.artem.alaverdyan.vspmlauncher.launch
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
 
+@Suppress("unused")
 @Serializable
 data class GameVersionInfo(
     val mcVersion: String,

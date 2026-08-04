@@ -11,7 +11,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
@@ -29,16 +28,7 @@ import ru.artem.alaverdyan.vspmlauncher.ui.components.CustomTitleBar
 import ru.artem.alaverdyan.vspmlauncher.ui.theme.GlassConfig
 import ru.artem.alaverdyan.vspmlauncher.ui.theme.windowFrame
 
-private const val WM_ENV = "_JAVA_AWT_WM_NONREPARENTING"
-
 fun main() {
-    // "Декоратор приложения" — своё оформление окна (скруглённые углы, своя
-    // шапка, стеклянный эффект) вместо обычного системного окна. Настоящая
-    // прозрачность (TransparencyMode.REAL) на Linux рендерится через аппаратный
-    // (OpenGL) рендер Skiko с ошибками — окно остаётся видимым прямоугольником
-    // вместо прозрачных углов. Программный рендер это чинит, но переключатель
-    // должен быть выставлен САМЫМ первым делом в main(), до того как Skiko
-    // создаст графический контекст.
     val decoratorEnabled = SettingsStorage.loadAppDecoratorEnabled()
     val transparencyMode = SettingsStorage.loadTransparencyMode()
     val isLinux = PlatformInfo.os == "linux"
@@ -74,21 +64,10 @@ private fun launcherApp(decoratorEnabled: Boolean, useRealTransparency: Boolean)
         window.minimumSize = java.awt.Dimension(760, 480)
 
         val isMaximized = mainWindowState.placement == WindowPlacement.Maximized
-
-        // Реальный (не угаданный) размер/позиция окна до maximize — нужно
-        // самим сохранять их до переключения placement, т.к. WindowState
-        // после ухода в Maximized уже не хранит "тот" размер, а undecorated
-        // Frame.MAXIMIZED_BOTH — это Java-эмуляция, а не настоящий OS-статус,
-        // так что положиться тут на что-то нативное нельзя.
         var restoredSize by remember { mutableStateOf(mainWindowState.size) }
         var restoredPosition by remember { mutableStateOf(mainWindowState.position) }
         val density = LocalDensity.current
         val restoredWidthPx = with(density) { restoredSize.width.toPx() }.toInt()
-        // Без настоящей прозрачности (fake-режим на Linux) скругление не рисуем —
-        // окно непрозрачное, обрезанные Compose'ом углы превратились бы в чёрные
-        // "уголки". Поэтому в fake-режиме окно прямоугольное, "прозрачность"
-        // видна только на стеклянных панелях внутри — просвечивают собственный
-        // статичный фон лаунчера, а не рабочий стол.
         val activeCornerRadius = if (!decoratorEnabled || isMaximized || !useRealTransparency) {
             0.dp
         } else {
@@ -126,8 +105,6 @@ private fun launcherApp(decoratorEnabled: Boolean, useRealTransparency: Boolean)
                             },
                             isMaximized = isMaximized,
                             onRestoreFromMaximizedDrag = { targetXPx, targetYPx ->
-                                // targetXPx/targetYPx приходят в экранных пикселях
-                                // (AWT window.x/y), а WindowPosition ждёт Dp
                                 mainWindowState.placement = WindowPlacement.Floating
                                 mainWindowState.size = restoredSize
                                 with(density) {
@@ -196,16 +173,4 @@ private fun launcherApp(decoratorEnabled: Boolean, useRealTransparency: Boolean)
             }
         }
     }
-}
-
-private fun relaunchWithWaylandFix(): Nothing {
-    val info = ProcessHandle.current().info()
-    val cmd = buildList {
-        add(info.command().orElse("java"))
-        addAll(info.arguments().orElse(emptyArray()))
-    }
-    val pb = ProcessBuilder(cmd).inheritIO()
-    pb.environment()[WM_ENV] = "1"
-    val code = runCatching { pb.start().waitFor() }.getOrDefault(1)
-    kotlin.system.exitProcess(code)
 }

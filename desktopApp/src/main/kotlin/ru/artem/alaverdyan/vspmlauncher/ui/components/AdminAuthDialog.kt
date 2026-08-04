@@ -14,11 +14,6 @@ import kotlinx.coroutines.launch
 import ru.artem.alaverdyan.vspmlauncher.network.LauncherApi
 import ru.artem.alaverdyan.vspmlauncher.ui.theme.airGlass
 
-/**
- * Диалог пароля для входа в AdminScreen (открывается после 6 кликов по лого).
- * Стиль — Air Glass, как весь остальной интерфейс, а не стоковый Material Surface.
- * На локе (5 неудачных попыток -> сервер уже забанил IP) лаунчер закрывается — см. onLockedOut в App.kt.
- */
 @Composable
 fun AdminAuthDialog(
     onDismiss: () -> Unit,

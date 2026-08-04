@@ -28,7 +28,6 @@ fun NicknameSetupScreen(
             windAngleDegrees = -20f
         )
 
-        // Логотип и панель ввода теперь в одной колонке — не могут перекрыться
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val logoSize = (maxWidth * 0.18f).coerceIn(100.dp, 160.dp)
             val panelWidth = (maxWidth * 0.4f).coerceIn(280.dp, 420.dp)

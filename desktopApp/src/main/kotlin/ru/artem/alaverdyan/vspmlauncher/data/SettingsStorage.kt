@@ -3,29 +3,10 @@ package ru.artem.alaverdyan.vspmlauncher.data
 import java.io.File
 import java.util.prefs.Preferences
 
-/**
- * Что делает лаунчер при успешном старте игры.
- * MINIMIZE — сворачивает главное окно (по умолчанию)
- * CLOSE — закрывает лаунчер полностью
- * SHOW_CONSOLE — держит главное окно как есть и дополнительно открывает окно консоли
- */
 enum class LaunchBehavior {
     MINIMIZE, HIDE, CLOSE, SHOW_CONSOLE
 }
 
-/**
- * Способ отрисовки прозрачности окна. Актуально только на Linux —
- * на Windows/macOS всегда используется REAL, т.к. там настоящая
- * прозрачность окна рендерится корректно "из коробки".
- *
- * REAL — настоящая прозрачность окна (видно рабочий стол/окна позади).
- *        На Linux для этого включается программный рендер Skiko,
- *        т.к. аппаратный (OpenGL) рендер неправильно считает альфа-канал окна.
- * FAKE — без настоящей прозрачности: окно остаётся полностью непрозрачным
- *        прямоугольником (без скруглённых углов), но все "стеклянные" панели
- *        внутри лаунчера по-прежнему полупрозрачные — они просвечивают
- *        не рабочий стол, а собственный фон лаунчера.
- */
 enum class TransparencyMode {
     REAL, FAKE
 }
@@ -68,10 +49,6 @@ object SettingsStorage {
         prefs.put(KEY_JRE_PATH, path)
     }
 
-    // Корневая папка, куда лаунчер ставит игру, рантаймы Java и служебные файлы
-    // (все они лежат внутри неё в подпапках game/, runtimes/ и т.д.). По умолчанию —
-    // "<домашняя папка>/.vspmlauncher", как было всегда захардкожено. Пользователь может
-    // сменить путь в настройках или прямо в диалоге выбора при первой установке.
     fun defaultInstallDir(): String = File(System.getProperty("user.home"), ".vspmlauncher").absolutePath
     fun loadInstallDir(): String = prefs.get(KEY_INSTALL_DIR, defaultInstallDir())
     fun saveInstallDir(path: String) {
@@ -83,22 +60,16 @@ object SettingsStorage {
         prefs.put(KEY_JVM_ARGS, args)
     }
 
-    // Качать JRE напрямую у поставщика (Adoptium/GraalVM) вместо зеркала лаунчера.
     fun loadDownloadJreFromOfficial(): Boolean = prefs.getBoolean(KEY_DOWNLOAD_JRE_FROM_OFFICIAL, false)
     fun saveDownloadJreFromOfficial(enabled: Boolean) {
         prefs.putBoolean(KEY_DOWNLOAD_JRE_FROM_OFFICIAL, enabled)
     }
 
-    // Качать клиент/ассеты Minecraft напрямую у Mojang вместо зеркала лаунчера.
     fun loadDownloadMinecraftFromOfficial(): Boolean = prefs.getBoolean(KEY_DOWNLOAD_MINECRAFT_FROM_OFFICIAL, false)
     fun saveDownloadMinecraftFromOfficial(enabled: Boolean) {
         prefs.putBoolean(KEY_DOWNLOAD_MINECRAFT_FROM_OFFICIAL, enabled)
     }
-    // "Декоратор приложения" — своё оформление окна лаунчера (скруглённые углы,
-    // кастомная шапка окна вместо системной, эффект стекла). Если у пользователя
-    // из-за этого едет отрисовка окна, он может выключить декоратор — тогда
-    // лаунчер откроется в обычном окне с системной рамкой, без каких-либо
-    // эффектов прозрачности.
+
     fun loadAppDecoratorEnabled(): Boolean = prefs.getBoolean(KEY_APP_DECORATOR_ENABLED, true)
     fun saveAppDecoratorEnabled(enabled: Boolean) {
         prefs.putBoolean(KEY_APP_DECORATOR_ENABLED, enabled)
@@ -112,10 +83,6 @@ object SettingsStorage {
         prefs.put(KEY_TRANSPARENCY_MODE, mode.name)
     }
 
-    // Раньше enabledModIds жил только в памяти App.kt и на каждом старте пересоздавался как
-    // "все id из serverMods" — отсюда "по умолчанию всё включено, но ничего не скачано".
-    // null означает "пользователь ещё ни разу не трогал список" — тогда App.kt сам решает,
-    // чем засеять набор при первой загрузке serverMods. Пустой Set — осознанный "всё выключено".
     private const val MOD_IDS_NOT_SET = "\u0000"
     fun loadEnabledModIds(): Set<String>? {
         val raw = prefs.get(KEY_ENABLED_MOD_IDS, MOD_IDS_NOT_SET)

@@ -8,7 +8,15 @@ import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -21,7 +29,6 @@ import ru.artem.alaverdyan.vspmlauncher.ui.components.AnimatedBackground
 import ru.artem.alaverdyan.vspmlauncher.ui.components.GlassButton
 import ru.artem.alaverdyan.vspmlauncher.ui.components.GlassPanel
 
-// Ниже этой ширины окна колонки с контролами складываются вертикально, а не жмутся в ряд.
 private val NARROW_LAYOUT_BREAKPOINT = 640.dp
 
 @Composable
@@ -34,6 +41,10 @@ fun AdminScreen(sessionToken: String, onBack: () -> Unit) {
     var diff by remember { mutableStateOf<BuildDiffDto?>(null) }
     var fromVersion by remember { mutableStateOf<String?>(null) }
     var toVersion by remember { mutableStateOf<String?>(null) }
+    var maintenanceEnabled by remember { mutableStateOf(false) }
+    var maintenanceMessage by remember { mutableStateOf("") }
+    var isMaintenanceBusy by remember { mutableStateOf(false) }
+    var maintenanceStatusMessage by remember { mutableStateOf<String?>(null) }
 
     var newsList by remember { mutableStateOf<List<NewsItemDto>>(emptyList()) }
     var newsTitle by remember { mutableStateOf("") }
@@ -65,8 +76,26 @@ fun AdminScreen(sessionToken: String, onBack: () -> Unit) {
 
     LaunchedEffect(channel) { reloadVersions() }
     LaunchedEffect(Unit) { reloadNews() }
-
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    LaunchedEffect(Unit) {
+        try {
+            val status = LauncherApi.getStatus()
+            maintenanceEnabled = status.maintenance
+            maintenanceMessage = status.maintenanceMessage.orEmpty()
+        } catch (_: Exception) { }
+    }
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    BoxWithConstraints( modifier = Modifier
+        .fillMaxSize()
+        .focusRequester(focusRequester)
+        .focusTarget()
+        .onPreviewKeyEvent { event ->
+            if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
+                onBack()
+                true
+            } else false
+        }
+    ) {
         val scale = (maxWidth / 1000.dp).coerceIn(0.6f, 1.6f)
         val isNarrow = maxWidth < NARROW_LAYOUT_BREAKPOINT
         val edgePadding = 24.dp * scale
@@ -139,6 +168,61 @@ fun AdminScreen(sessionToken: String, onBack: () -> Unit) {
                                 }
                             }
                         )
+                    }
+                }
+            }
+
+            GlassPanel(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp * scale)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Технические работы",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = (14 * scale).sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = maintenanceEnabled,
+                            onCheckedChange = { maintenanceEnabled = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color(0xFF4CD97B),
+                                checkedTrackColor = Color(0xFF4CD97B).copy(alpha = 0.5f),
+                                uncheckedThumbColor = Color.White.copy(alpha = 0.8f),
+                                uncheckedTrackColor = Color.White.copy(alpha = 0.25f)
+                            )
+                        )
+                    }
+                    if (maintenanceEnabled) {
+                        Spacer(Modifier.height(8.dp * scale))
+                        GlassTextField(
+                            value = maintenanceMessage,
+                            onValueChange = { maintenanceMessage = it },
+                            placeholder = "Сообщение для игроков",
+                            enabled = !isMaintenanceBusy,
+                            singleLine = false,
+                            modifier = Modifier.fillMaxWidth().height(80.dp * scale)
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp * scale))
+                    GlassButton(
+                        text = if (isMaintenanceBusy) "..." else "Сохранить",
+                        enabled = !isMaintenanceBusy,
+                        scale = scale,
+                        onClick = {
+                            isMaintenanceBusy = true
+                            scope.launch {
+                                val (_, message) = LauncherApi.adminSetMaintenance(
+                                    sessionToken, maintenanceEnabled, maintenanceMessage
+                                )
+                                maintenanceStatusMessage = message
+                                isMaintenanceBusy = false
+                            }
+                        }
+                    )
+                    maintenanceStatusMessage?.let {
+                        Spacer(Modifier.height(6.dp * scale))
+                        Text(it, color = Color(0xFFFFC107), fontSize = (13 * scale).sp)
                     }
                 }
             }
@@ -296,7 +380,6 @@ fun AdminScreen(sessionToken: String, onBack: () -> Unit) {
     }
 }
 
-/** На узком окне — колонка вместо ряда, чтобы контролы не жались друг в друга. */
 @Composable
 private fun ChipRow(isNarrow: Boolean, scale: Float, content: @Composable () -> Unit) {
     if (isNarrow) {

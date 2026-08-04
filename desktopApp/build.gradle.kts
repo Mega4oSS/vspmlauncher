@@ -29,7 +29,9 @@ kotlin {
 compose.desktop {
     application {
         mainClass = "ru.artem.alaverdyan.vspmlauncher.MainKt"
-        javaHome = System.getenv("JAVA_HOME_22_X64") ?: System.getenv("JAVA_HOME")
+        javaHome = System.getenv("JAVA_HOME_22_X64")
+            ?: System.getenv("JAVA_HOME")
+                    ?: "C:\\Program Files\\Java\\jdk-22" // дефолтный путь, если переменные не заданы
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.Exe)

@@ -1,3 +1,5 @@
+@file:Suppress("unused", "PropertyName")
+
 package ru.artem.alaverdyan.vspmlauncher.network
 
 import kotlinx.serialization.Serializable
@@ -97,6 +99,13 @@ data class AdminNewsPublishRequestDto(
     val title: String,
     val body: String,
     val pinned: Boolean = false
+)
+
+@Serializable
+data class AdminMaintenanceRequestDto(
+    val maintenance: Boolean,
+    val message: String? = null,
+    val until: Long? = null
 )
 
 @Serializable

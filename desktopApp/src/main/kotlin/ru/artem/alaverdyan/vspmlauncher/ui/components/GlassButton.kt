@@ -19,14 +19,6 @@ import androidx.compose.ui.unit.sp
 import ru.artem.alaverdyan.vspmlauncher.ui.theme.GlassConfig
 import ru.artem.alaverdyan.vspmlauncher.ui.theme.airGlass
 
-/**
- * Стеклянная кнопка — единый стиль вместо Material Button для всех второстепенных
- * действий (AdminScreen, диалоги и т.п.). SmartLaunchButton/SettingsButton не трогаем,
- * это отдельные именованные компоненты со своей семантикой.
- *
- * @param selected подсвечивает кнопку как "активную" (например, выбранный канал/версию) —
- * просто более плотная заливка стекла, без смены формы/цвета текста.
- */
 @Composable
 fun GlassButton(
     text: String,
@@ -60,7 +52,7 @@ fun GlassButton(
             text,
             color = Color.White,
             fontSize = (13 * scale).sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal // доп. подчёркивание выбора
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
         )
     }
 }

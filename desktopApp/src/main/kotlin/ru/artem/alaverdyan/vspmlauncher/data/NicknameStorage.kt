@@ -11,8 +11,4 @@ object NicknameStorage {
     fun save(nickname: String) {
         prefs.put(KEY_NICKNAME, nickname)
     }
-
-    fun clear() {
-        prefs.remove(KEY_NICKNAME)
-    }
 }

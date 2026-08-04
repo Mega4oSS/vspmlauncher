@@ -94,10 +94,6 @@ object Downloader {
                     val downloadUrl = resolveDownloadUrl(entry)
                     fetchTo(downloadUrl)
 
-                    // Official-источник (Mojang) может отдать файл, не совпадающий с тем, что
-                    // ожидает манифест сборки — например путь пропатчен модлоадером на бэкенде.
-                    // Без этой проверки такой файл будет вечно считаться "битым" на каждой
-                    // следующей проверке обновлений и вечно перекачиваться с Mojang заново.
                     if (sha256Of(target) != entry.sha256) {
                         val mirrorUrl = LauncherApi.resolveUrl(entry.url)
                         if (mirrorUrl != downloadUrl) {
@@ -116,10 +112,6 @@ object Downloader {
         jobs.awaitAll()
     }
 
-    // Официальный источник пробуем только для файлов, чей путь есть в официальном
-    // version.json Mojang (libraries/…, versions/…/*.jar, assets/…) — модлоадер,
-    // моды и всё из reallyBuild там просто не найдутся, resolveUrl вернёт null,
-    // и мы тихо откатимся на зеркало лаунчера.
     private suspend fun resolveDownloadUrl(entry: FileEntryDto): String {
         if (SettingsStorage.loadDownloadMinecraftFromOfficial()) {
             val official = runCatching {

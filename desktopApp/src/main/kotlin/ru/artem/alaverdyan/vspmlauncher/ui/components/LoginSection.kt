@@ -48,13 +48,6 @@ fun NicknameField(
     )
 }
 
-/**
- * Умная кнопка запуска.
- * @param needsUpdate true — версия/моды не совпадают с актуальными, кнопка становится "Обновить"/"Установить"
- * @param hasExistingInstall false — игра ещё ни разу не скачивалась (нет папок) → кнопка "Установить" вместо "Обновить"
- * @param isRunning true — процесс игры сейчас запущен → кнопка "Закрыть", клик завершает процесс
- * @param isMaintenance true — на сервере тех.работы: кнопка остаётся кликабельной, но над ней предупреждение
- */
 @Composable
 fun SmartLaunchButton(
     needsUpdate: Boolean,
@@ -95,14 +88,13 @@ fun SmartLaunchButton(
         }
 
         val backgroundColor = when {
-            isRunning -> Color(0xFFFF5252)   // красная — действие "закрыть"
-            needsUpdate -> Color(0xFF3E9CFF) // синяя — обновить/установить
-            else -> Color(0xFF4CD97B)        // зелёная — запуск
+            isRunning -> Color(0xFFFF5252)
+            needsUpdate -> Color(0xFF3E9CFF)
+            else -> Color(0xFF4CD97B)
         }
 
         Button(
             onClick = onClick,
-            // во время isRunning кнопка НЕ дизейблится — иначе закрыть игру будет нельзя
             enabled = isRunning || (!isBusy && !isCheckingUpdates),
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(backgroundColor = backgroundColor),

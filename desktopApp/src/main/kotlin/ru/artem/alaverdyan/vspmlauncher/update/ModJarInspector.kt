@@ -23,7 +23,7 @@ object ModJarInspector {
             }
             zip.getEntry("META-INF/mods.toml")?.let { entry ->
                 val text = zip.getInputStream(entry).bufferedReader().readText()
-                fun field(key: String) = Regex(key + "\\s*=\\s*\"([^\"]*)\"").find(text)?.groupValues?.get(1)
+                fun field(key: String) = Regex("$key\\s*=\\s*\"([^\"]*)\"").find(text)?.groupValues?.get(1)
                 return@use ParsedModInfo(
                     id = field("modId") ?: jar.nameWithoutExtension,
                     name = field("displayName") ?: jar.nameWithoutExtension,

@@ -1,3 +1,5 @@
+@file:Suppress("unused")
+
 package ru.artem.alaverdyan.vspmlauncher.network
 
 import io.ktor.client.call.body
@@ -6,16 +8,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 
-/**
- * Сопоставляет относительные пути файлов сборки (libraries/…, versions/…, assets/…)
- * с официальными URL Mojang для конкретной версии Minecraft. Строится один раз за
- * запуск лаунчера и кэшируется — иначе на каждый файл пришлось бы заново тянуть
- * манифест версии и индекс ассетов.
- *
- * Библиотеки модлоадера (Fabric/Forge) и моды в эту карту не попадают —
- * их просто нет в официальном version.json Mojang, поэтому lookup по их
- * пути вернёт null и вызывающий код сам откатится на зеркало лаунчера.
- */
 object MojangOfficialSources {
     private const val VERSION_MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
     private const val RESOURCES_BASE = "https://resources.download.minecraft.net"

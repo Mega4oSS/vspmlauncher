@@ -44,29 +44,6 @@ import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.LocalMinimumTouchTargetEnforcement
 import androidx.compose.runtime.CompositionLocalProvider
 
-/**
- * Кастомный титлбар вместо системной рамки ОС — тот же Air Glass стиль,
- * что и весь лаунчер.
- *
- * ВАЖНО: окно undecorated (нужно для real per-pixel transparency на
- * стеклянных углах), а значит у него НЕТ настоящего нативного
- * WM_CAPTION / "zoomed"-состояния — Frame.MAXIMIZED_BOTH для
- * undecorated-окна это чисто Java-эмуляция (растягивание bounds), а не
- * реальный OS-статус, которым пользуется DefWindowProc при
- * restore-под-курсором. Поэтому WM_SYSCOMMAND/SC_MOVE тут не помогает —
- * драг и restore сделаны полностью вручную, своим состоянием, без
- * обращения к WindowPlacement/extendedState во время самого драга.
- *
- * restoredWidthPx — РЕАЛЬНЫЙ (не угаданный через preferredSize!) размер
- * окна до maximize; вызывающий код обязан сохранить его сам (см.
- * Main.kt) до того, как выставить WindowPlacement.Maximized.
- *
- * onRestoreFromMaximizedDrag(targetX, targetY) — вызывается один раз, в
- * момент первого сдвига курсора во время драга maximized-окна;
- * вызывающий код должен тут же выставить Floating + реальный
- * restoredSize + позицию (targetX, targetY), чтобы курсор остался на
- * той же точке заголовка, где был схвачен.
- */
 @OptIn(ExperimentalMaterialApi::class, ExperimentalComposeUiApi::class)
 @Composable
 fun WindowScope.CustomTitleBar(
@@ -89,9 +66,6 @@ fun WindowScope.CustomTitleBar(
 
     var lastClickTime by remember { mutableStateOf(0L) }
 
-    // читаем актуальные значения ВНУТРИ уже идущего pointerInput без
-    // его перезапуска — раньше он был ключован на isMaximized, из-за
-    // чего жест обрывался и стартовал заново прямо посреди драга
     val isMaximizedState = rememberUpdatedState(isMaximized)
     val restoreCallbackState = rememberUpdatedState(onRestoreFromMaximizedDrag)
     val restoredWidthState = rememberUpdatedState(restoredWidthPx)
@@ -126,7 +100,7 @@ fun WindowScope.CustomTitleBar(
 
                                 restoreCallbackState.value?.invoke(targetX, targetY)
                                 didRestore = true
-                            } else if (!startedMaximized || didRestore) {
+                            } else {
                                 window.setLocation(
                                     window.x + change.position.x.toInt() - down.position.x.toInt(),
                                     window.y + change.position.y.toInt() - down.position.y.toInt()

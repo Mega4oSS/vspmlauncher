@@ -11,7 +11,7 @@ import ru.artem.alaverdyan.vspmlauncher.ui.theme.airGlass
 fun GlassPanel(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = GlassConfig.CornerRadius,
-    fillAlpha: Float = GlassConfig.FillAlpha,
+    fillAlpha: Float = GlassConfig.FILL_ALPHA,
     content: @Composable () -> Unit
 ) {
     Box(modifier = modifier.airGlass(cornerRadius = cornerRadius, fillAlpha = fillAlpha)) {

@@ -27,9 +27,7 @@
 
             WindEffect(
                 modifier = Modifier.fillMaxSize(),
-                angleDegrees = windAngleDegrees,
-                particleCount = 60,
-                speed = 1.4f
+                angleDegrees = windAngleDegrees
             )
         }
     }

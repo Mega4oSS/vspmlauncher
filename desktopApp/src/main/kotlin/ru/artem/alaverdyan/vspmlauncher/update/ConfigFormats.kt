@@ -2,18 +2,10 @@ package ru.artem.alaverdyan.vspmlauncher.update
 
 import kotlinx.serialization.json.*
 
-/**
- * !! Продублировано с бэкендом (ru.artem.alaverdyan.vspmbackend.storage.ConfigFormats).
- * Парсинг/сериализация должны быть идентичны — там считается диф, тут он накладывается.
- * Меняешь формат тут — меняй и там.
- */
 object ConfigFormats {
 
     private enum class Format { JSON, PROPERTIES }
 
-    // Зеркало backend'овской ConfigFormats.isMergeablePath — используется FileIntegrityVerifier,
-    // чтобы НЕ сверять кастомизированные (игроком/авто-тюнингом) конфиги по sha256 с эталоном:
-    // расхождение с дефолтом тут ожидаемо и корректно, это и есть весь смысл key-level патчей.
     fun isMergeablePath(path: String): Boolean {
         if (!path.startsWith("config/")) return false
         return detectFormat(path) != null
@@ -84,8 +76,8 @@ object ConfigFormats {
             when (el) {
                 is JsonObject -> el.entries.forEach { (k, v) -> walk(v, if (path.isEmpty()) k else "$path.$k") }
                 is JsonArray -> el.forEachIndexed { i, v -> walk(v, "$path[$i]") }
-                is JsonPrimitive -> result[path] = el.content
                 is JsonNull -> result[path] = "null"
+                is JsonPrimitive -> result[path] = el.content
             }
         }
         walk(element, "")

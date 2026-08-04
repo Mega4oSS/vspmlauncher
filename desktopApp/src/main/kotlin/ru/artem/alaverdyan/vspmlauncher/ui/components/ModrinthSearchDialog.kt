@@ -50,22 +50,13 @@ private val CATEGORIES = listOf(
     "food" to "Еда"
 )
 
-// Если когда-нибудь заведёшь forge/neoforge-канал — вынести в параметр.
 private const val MOD_LOADER = "fabric"
 private const val SEARCH_DEBOUNCE_MS = 400L
-
-// Референсная ширина панели, от которой считается scale (см. ModrinthSearchDialog).
 private val DIALOG_REFERENCE_WIDTH = 880.dp
-private val DIALOG_MAX_WIDTH = 880.dp
-private val DIALOG_MAX_HEIGHT = 620.dp
 private val DIALOG_MIN_WIDTH = 360.dp
 private val DIALOG_MIN_HEIGHT = 420.dp
-// Ниже этой ширины панели — sidebar с деталями мода уезжает под список, а не сжимается вбок до нечитаемости.
 private val COMPACT_LAYOUT_THRESHOLD = 620.dp
 private val SIDEBAR_WIDTH = 260.dp
-
-// Тот же красный/checkmark-зелёный, что уже используют MainScreen.launchError и SmartLaunchButton —
-// не заводим новую палитру под один диалог.
 private val ErrorBg = Color(0xFFFF5252).copy(alpha = 0.18f)
 private val ErrorIcon = Color(0xFFFF8A80)
 private val ErrorText = Color(0xFFFFCDD2)
@@ -89,7 +80,6 @@ fun ModrinthSearchDialog(onDismiss: () -> Unit, onInstalled: () -> Unit) {
     val scope = rememberCoroutineScope()
     var searchJob by remember { mutableStateOf<Job?>(null) }
     var detailsJob by remember { mutableStateOf<Job?>(null) }
-    // Защита от гонки: только ответ на самый последний клик по моду попадёт в selectedDetails.
     var detailsRequestId by remember { mutableStateOf(0) }
 
     fun runSearch(debounce: Boolean = false) {
@@ -277,7 +267,6 @@ fun ModrinthSearchDialog(onDismiss: () -> Unit, onInstalled: () -> Unit) {
     }
 }
 
-// Левая колонка: поиск, категории, список результатов. Используется и в compact-, и в wide-раскладке.
 @Composable
 private fun SearchListColumn(
     query: String,
@@ -308,8 +297,6 @@ private fun SearchListColumn(
                 maxLines = 1,
                 modifier = Modifier.weight(1f, fill = false)
             )
-            // Box вместо IconButton — убираем скрытый minimumTouchTargetSize(),
-            // который двигал кнопку относительно видимого кружка airGlass.
             Box(
                 modifier = Modifier
                     .size(32.dp * scale)
@@ -328,8 +315,6 @@ private fun SearchListColumn(
         Spacer(Modifier.height(12.dp * scale))
 
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            // Тот же рецепт, что NicknameField: OutlinedTextField, скругление 14dp,
-            // белый текст/курсор поверх стекла — а не голый Material TextField со своими цветами.
             OutlinedTextField(
                 value = query,
                 onValueChange = onQueryChange,
@@ -364,10 +349,6 @@ private fun SearchListColumn(
         }
 
         Spacer(Modifier.height(10.dp * scale))
-
-        // ПК-приложение: никакого horizontalScroll для чипов — колесо мыши на десктопе
-        // скроллит вертикально, горизонтальный скролл без Shift недоступен и не нагляден.
-        // Категорий немного — переносим по строкам, видно сразу всё.
         val categoryRows = remember { CATEGORIES.chunked(5) }
         Column(verticalArrangement = Arrangement.spacedBy(6.dp * scale)) {
             categoryRows.forEach { row ->
@@ -447,7 +428,6 @@ private fun SearchListColumn(
     }
 }
 
-// Правая панель (или нижний блок в compact-режиме): детали выбранного мода и кнопка установки.
 @Composable
 private fun DetailsColumn(
     selectedHit: ModrinthHitDto?,
@@ -563,7 +543,6 @@ private fun ModIcon(url: String?, size: Dp) {
     }
 }
 
-// Один и тот же банер ошибки, что уже используется в MainScreen (launchError) — не изобретаем новый.
 @Composable
 private fun ErrorBanner(text: String, scale: Float) {
     Row(
@@ -578,7 +557,6 @@ private fun ErrorBanner(text: String, scale: Float) {
     }
 }
 
-// --- Парсинг markdown-body из Modrinth: картинки — в реальные Image, весь остальной markdown-мусор — зачищаем ---
 
 private sealed class BodySegment {
     data class Text(val text: String) : BodySegment()
@@ -586,19 +564,14 @@ private sealed class BodySegment {
     data class Image(val url: String) : BodySegment()
 }
 
-// [<img src="url" ...>](anyLink) — картинка, завёрнутая в ссылку. Ловим ДО обычных img/ссылок.
 private val LINKED_HTML_IMAGE_REGEX = Regex(
     """\[\s*<img[^>]*\ssrc=["']([^"']+)["'][^>]*>\s*]\([^)]*\)""",
     RegexOption.IGNORE_CASE
 )
 
-// Голый <img src="url" ...>
 private val HTML_IMAGE_REGEX = Regex("""<img[^>]*\ssrc=["']([^"']+)["'][^>]*>""", RegexOption.IGNORE_CASE)
-// ![alt](url)
 private val MARKDOWN_IMAGE_REGEX = Regex("""!\[[^\]]*]\((\S+?)(?:\s+"[^"]*")?\)""")
-// Голая ссылка прямо на файл картинки, без markdown-обёртки
 private val BARE_IMAGE_URL_REGEX = Regex("""https?://\S+\.(?:png|jpe?g|gif|webp)(?:\?\S*)?""", RegexOption.IGNORE_CASE)
-// Обычная markdown-ссылка [текст](url) — оставляем только текст
 private val MARKDOWN_LINK_REGEX = Regex("""\[([^\]]*)]\(([^)]*)\)""")
 
 private val ALL_IMAGE_PATTERNS = listOf(
@@ -608,7 +581,6 @@ private val ALL_IMAGE_PATTERNS = listOf(
     BARE_IMAGE_URL_REGEX
 )
 
-// Убирает markdown-разметку из чистого текстового куска: **bold**, *italic*, `code`, голые ссылки без картинок и т.п.
 private fun cleanMarkdownText(text: String): String {
     var result = text
     result = MARKDOWN_LINK_REGEX.replace(result) { it.groupValues[1] } // [текст](url) -> текст
@@ -640,7 +612,6 @@ private fun parseBodySegments(body: String): List<BodySegment> {
     return segments
 }
 
-// Разбивает кусок текста на заголовки (#, ##, ###...) и обычные абзацы, попутно чистя markdown.
 private fun splitIntoTextAndHeaders(chunk: String): List<BodySegment> {
     val result = mutableListOf<BodySegment>()
     val paragraphs = chunk.split(Regex("\n\\s*\n"))
@@ -661,7 +632,7 @@ private fun splitIntoTextAndHeaders(chunk: String): List<BodySegment> {
 
 @Composable
 private fun ParsedBodyContent(body: String, scale: Float) {
-    val segments = remember(body) { parseBodySegments(body).take(30) } // потолок против спама
+    val segments = remember(body) { parseBodySegments(body).take(30) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp * scale)) {
         segments.forEach { segment ->
             when (segment) {

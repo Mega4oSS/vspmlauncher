@@ -164,6 +164,27 @@ fun DownloadProgressBar(
                     backgroundColor = Color.White.copy(alpha = 0.15f)
                 )
             }
+
+            ProgressPhase.MOVING -> {
+                Text(
+                    text = "Перемещение: ${progress.currentFile} (${progress.fileIndex}/${progress.totalFiles})",
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = (12 * scale).sp
+                )
+
+                LinearProgressIndicator(
+                    progress = fraction,
+                    modifier = Modifier.fillMaxWidth().height(6.dp * scale),
+                    color = Color(0xFFFFD54F),
+                    backgroundColor = Color.White.copy(alpha = 0.15f)
+                )
+
+                Text(
+                    text = "${formatBytes(progress.downloadedBytes)} / ${formatBytes(progress.totalBytes)} ($percent%)",
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = (11 * scale).sp
+                )
+            }
         }
     }
 }

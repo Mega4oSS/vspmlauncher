@@ -21,15 +21,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
-/**
- * Логотип, который при появлении "влетает" на своё место с лёгким пружинным перелётом,
- * а затем плавно покачивается (float + небольшой поворот) в бесконечном цикле.
- *
- * @param flyInFromX / flyInFromY стартовое смещение (px) относительно конечной позиции —
- *        меняй, чтобы логотип вылетал из другого угла/направления
- * @param floatAmplitudeDp амплитуда покачивания вверх-вниз в состоянии покоя
- * @param floatDurationMs период одного цикла покачивания
- */
 @Composable
 fun AnimatedLogo(
     imageResPath: String = "logo/logo_placeholder.png",

@@ -6,23 +6,17 @@ import java.io.File
 data class ConflictInfo(
     val path: String,
     val key: String,
-    val localValue: String?,      // что реально было у игрока на диске
-    val serverOldValue: String?,  // что ожидалось (значение в fromVersion на сервере)
-    val serverNewValue: String?   // чем принудительно заменили (значение в toVersion на сервере)
+    val localValue: String?,
+    val serverOldValue: String?,
+    val serverNewValue: String?
 )
 
-/**
- * Накладывает патч на локальный файл, не трогая ключи, которых патч не касается —
- * локальные правки игрока/мода вне изменённых сервером ключей сохраняются как есть.
- * Если по конкретному ключу локальное значение разошлось с тем, что сервер ожидал
- * увидеть (fromVersion), это конфликт — но патч всё равно применяется, побеждает сервер.
- */
 object ConfigMerger {
 
     fun applyPatch(localFile: File, patch: ConfigPatchDto): List<ConflictInfo> {
         val original = localFile.readText()
         val localState = ConfigFormats.parse(patch.path, original)
-            ?: return emptyList() // локальный файл вдруг не распарсился — не мёрджим, оставляем как есть
+            ?: return emptyList()
 
         val conflicts = mutableListOf<ConflictInfo>()
         val newValues = localState.toMutableMap()

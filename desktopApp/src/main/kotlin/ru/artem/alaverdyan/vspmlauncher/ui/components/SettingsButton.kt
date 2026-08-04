@@ -11,9 +11,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import ru.artem.alaverdyan.vspmlauncher.ui.theme.airGlass
 
-/**
- * Кнопка настроек — для будущего перехода к экрану конфигурации (ОЗУ, пути установки и т.д.)
- */
 @Composable
 fun SettingsButton(
     onClick: () -> Unit,
@@ -30,7 +27,7 @@ fun SettingsButton(
             imageVector = Icons.Filled.Settings,
             contentDescription = "Настройки",
             tint = Color.White,
-            modifier = Modifier.size(24.dp * scale) // иконка тоже иначе не масштабируется вместе с кнопкой
+            modifier = Modifier.size(24.dp * scale)
         )
     }
 }

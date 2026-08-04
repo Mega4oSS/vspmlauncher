@@ -14,7 +14,15 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -26,6 +34,7 @@ import ru.artem.alaverdyan.vspmlauncher.data.TransparencyMode
 import ru.artem.alaverdyan.vspmlauncher.network.ClientModEntryDto
 import ru.artem.alaverdyan.vspmlauncher.runtime.PlatformInfo
 import ru.artem.alaverdyan.vspmlauncher.ui.components.AnimatedBackground
+import ru.artem.alaverdyan.vspmlauncher.ui.components.DirectoryPickerDialog
 import ru.artem.alaverdyan.vspmlauncher.ui.components.DownloadProgressBar
 import ru.artem.alaverdyan.vspmlauncher.ui.components.GlassButton
 import ru.artem.alaverdyan.vspmlauncher.ui.components.GlassPanel
@@ -36,8 +45,6 @@ import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
 
-// Референсная ширина окна, от которой считается scale — подобрана под типичное окно лаунчера.
-// Ниже этой ширины шрифты уменьшаются (не сильнее FONT_SCALE_MIN), выше — растут (не сильнее FONT_SCALE_MAX).
 private val FONT_SCALE_REFERENCE_WIDTH = 1100.dp
 private const val FONT_SCALE_MIN = 0.9f
 private const val FONT_SCALE_MAX = 1.35f
@@ -57,6 +64,7 @@ fun SettingsScreen(
     installDir: String,
     hasExistingInstall: Boolean = false,
     onInstallDirChange: (String) -> Unit = {},
+    onInstallDirMove: (String) -> Unit = {},
     jvmArgs: String,
     downloadJreFromOfficial: Boolean,
     onDownloadJreFromOfficialChange: (Boolean) -> Unit,
@@ -78,7 +86,20 @@ fun SettingsScreen(
     onDismissVerifyResult: () -> Unit = {},
     onBack: () -> Unit
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .focusRequester(focusRequester)
+            .focusTarget()
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
+                    onBack()
+                    true
+                } else false
+            }
+    ) {
         AnimatedBackground(
             imageResPath = "images/bg_placeholder.png",
             blurRadius = 18.dp,
@@ -86,8 +107,6 @@ fun SettingsScreen(
         )
 
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            // Считаем от реальной ширины окна, а не от панели — панель сама fillMaxWidth(0.6f),
-            // так что она растёт вместе с окном, и шрифты должны расти вместе с ней.
             val scale = (maxWidth / FONT_SCALE_REFERENCE_WIDTH).coerceIn(FONT_SCALE_MIN, FONT_SCALE_MAX)
 
             GlassPanel(
@@ -110,7 +129,7 @@ fun SettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(24.dp)
                     ) {
                         NicknameSection(currentNickname, onNicknameChange, scale)
-                        InstallDirSection(installDir, hasExistingInstall, onInstallDirChange, scale)
+                        InstallDirSection(installDir, hasExistingInstall, onInstallDirChange, onInstallDirMove, scale)
                         RamSection(ramMb, onRamChange, scale)
                         RuntimeSection(runtimeId, onRuntimeIdChange, scale)
                         LaunchBehaviorSection(launchBehavior, onLaunchBehaviorChange, scale)
@@ -331,7 +350,7 @@ private fun ModsSection(
             )
             GlassButton(
                 text = "Скачать с Modrinth",
-                selected = true, // акцент — основное действие в этом блоке
+                selected = true,
                 scale = scale,
                 onClick = { showModrinthDialog = true }
             )
@@ -383,7 +402,6 @@ private fun pickModJarFile(): File? {
     return File(dir, name)
 }
 
-// --- Источники загрузки: официальные сервера vs собственный бэкенд лаунчера ---
 @Composable
 private fun SourcesSection(
     downloadJreFromOfficial: Boolean,
@@ -448,7 +466,6 @@ private fun SourceToggleRow(
     }
 }
 
-// --- Поведение лаунчера при запуске игры ---
 @Composable
 private fun LaunchBehaviorSection(
     behavior: LaunchBehavior,
@@ -490,7 +507,6 @@ private fun LaunchBehaviorSection(
     }
 }
 
-// --- Оформление окна лаунчера ---
 @Composable
 private fun AppDecoratorSection(
     enabled: Boolean,
@@ -532,8 +548,6 @@ private fun AppDecoratorSection(
             )
         }
 
-        // Выбор реальной/имитированной прозрачности показываем только на Linux —
-        // на Windows и macOS настоящая прозрачность и так работает без проблем.
         if (enabled && PlatformInfo.os == "linux") {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
@@ -734,9 +748,10 @@ private fun InstallDirSection(
     installDir: String,
     hasExistingInstall: Boolean,
     onInstallDirChange: (String) -> Unit,
+    onInstallDirMove: (String) -> Unit,
     scale: Float
 ) {
-    val scope = rememberCoroutineScope()
+    var showPicker by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionLabel("Папка установки", scale)
@@ -753,20 +768,19 @@ private fun InstallDirSection(
                 fontSize = (13 * scale).sp,
                 modifier = Modifier.weight(1f).padding(vertical = 12.dp)
             )
-            TextButton(onClick = {
-                scope.launch {
-                    val picked = withContext(Dispatchers.IO) { pickInstallDirectory(File(installDir)) }
-                    if (picked != null) onInstallDirChange(picked.absolutePath)
-                }
-            }) {
-                Text("Обзор...", color = Color.White.copy(alpha = 0.8f), fontSize = (13 * scale).sp)
+            TextButton(onClick = { showPicker = true }) {
+                Text(
+                    if (hasExistingInstall) "Переместить" else "Обзор...",
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = (13 * scale).sp
+                )
             }
         }
         Text(
             if (hasExistingInstall)
-                "Сюда лаунчер уже поставил игру, рантаймы Java и служебные файлы. Смена пути НЕ " +
-                        "переносит уже установленные файлы — лаунчер просто предложит установить " +
-                        "игру заново в новом месте (кнопка «Установить» ещё раз спросит папку)."
+                "Сюда лаунчер уже поставил игру, рантаймы Java и служебные файлы. Кнопка «Переместить» " +
+                        "перенесёт всё содержимое в выбранную папку — прогресс будет виден на главном " +
+                        "экране, старая папка удалится только после успешного переноса."
             else
                 "Сюда лаунчер поставит игру, рантаймы Java и служебные файлы. По умолчанию — " +
                         "папка в домашней директории. Кнопка «Установить» на главном экране тоже " +
@@ -775,20 +789,19 @@ private fun InstallDirSection(
             fontSize = (12 * scale).sp
         )
     }
-}
 
-// Директорию выбираем через JFileChooser (не FileDialog, как для jar-файла выше) — FileDialog
-// умеет выбирать папки только на macOS через недокументированное системное свойство, а
-// JFileChooser с DIRECTORIES_ONLY работает одинаково на Windows/Linux/macOS.
-internal fun pickInstallDirectory(initial: File): File? {
-    val chooser = javax.swing.JFileChooser(initial.takeIf { it.exists() } ?: initial.parentFile).apply {
-        fileSelectionMode = javax.swing.JFileChooser.DIRECTORIES_ONLY
-        isAcceptAllFileFilterUsed = false
-        dialogTitle = "Выбрать папку для установки"
-        selectedFile = initial
+    if (showPicker) {
+        DirectoryPickerDialog(
+            initialDir = File(installDir),
+            title = if (hasExistingInstall) "Куда перенести установку" else "Папка установки",
+            onDismiss = { showPicker = false },
+            onConfirm = { picked ->
+                showPicker = false
+                if (hasExistingInstall) onInstallDirMove(picked.absolutePath)
+                else onInstallDirChange(picked.absolutePath)
+            }
+        )
     }
-    val result = chooser.showDialog(null, "Выбрать")
-    return if (result == javax.swing.JFileChooser.APPROVE_OPTION) chooser.selectedFile else null
 }
 
 @Composable
@@ -819,7 +832,6 @@ private fun JreSection(jrePath: String, onJrePathChange: (String) -> Unit, scale
             placeholder = "Путь к java.exe / java",
             scale = scale
         )
-        // TODO: кнопка "Обзор..." с системным file picker
     }
 }
 
