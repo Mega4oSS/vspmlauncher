@@ -20,6 +20,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.3")
     implementation("io.ktor:ktor-client-okhttp:3.3.3")
     implementation("media.kamel:kamel-image-default:1.0.9")
+    implementation("com.github.oshi:oshi-core:6.6.5")
 }
 
 kotlin {

@@ -108,6 +108,7 @@ fun App(
     var launchError by remember { mutableStateOf<String?>(null) }
     var runningProcess by remember { mutableStateOf<Process?>(null) }
     val isGameRunning by remember { derivedStateOf { runningProcess != null } }
+    var closedByUser = false
 
     var backendStatus by remember { mutableStateOf<BackendStatus>(BackendStatus.Ok) }
 
@@ -332,12 +333,13 @@ fun App(
                 exitCode = exitCode
             )
 
-            if (exitCode != 0) {
+            if ((exitCode != 0) && !closedByUser) {
                 val tail = withContext(Dispatchers.IO) {
                     launchResult.logFile.readLines().takeLast(20).joinToString("\n")
                 }
                 launchError = "Игра упала (код $exitCode):\n$tail"
             }
+            closedByUser = false
         }
     }
 
@@ -470,6 +472,7 @@ fun App(
                             onDismissLaunchError = { launchError = null },
                             downloadProgress = downloadProgress,
                             onCloseGame = {
+                                closedByUser = true
                                 runningProcess?.destroy()
                             },
                             onLaunchOrUpdate = {

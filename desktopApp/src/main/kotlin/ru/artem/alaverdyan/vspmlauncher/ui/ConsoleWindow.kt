@@ -26,7 +26,10 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import ru.artem.alaverdyan.vspmlauncher.ui.components.AnimatedBackground
 
 @Suppress("unused")
@@ -60,9 +63,20 @@ fun ConsoleWindow(
     var justCopied by remember { mutableStateOf(false) }
 
     LaunchedEffect(outputFlow) {
-        outputFlow.collect { line ->
-            lines.add(line)
-            if (lines.size > 3000) lines.removeAt(0)
+        val pending = ArrayDeque<String>()
+        launch {
+            outputFlow.collect { pending.add(it) }
+        }
+        while (isActive) {
+            delay(80)
+            if (pending.isNotEmpty()) {
+                val batch = pending.toList()
+                pending.clear()
+                lines.addAll(batch)
+                if (lines.size > 3000) {
+                    repeat((lines.size - 3000)) { lines.removeAt(0) }
+                }
+            }
         }
     }
 

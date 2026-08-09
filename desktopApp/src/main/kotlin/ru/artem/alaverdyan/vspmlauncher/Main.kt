@@ -145,7 +145,7 @@ private fun launcherApp(decoratorEnabled: Boolean, useRealTransparency: Boolean)
             state = androidx.compose.ui.window.WindowState(width = 800.dp, height = 500.dp),
             undecorated = decoratorEnabled,
             icon = painterResource("logo/icon-128.png"),
-            transparent = useRealTransparency
+            transparent = false
         ) {
             val consoleCornerRadius = if (decoratorEnabled && useRealTransparency) GlassConfig.CornerRadius else 0.dp
 
