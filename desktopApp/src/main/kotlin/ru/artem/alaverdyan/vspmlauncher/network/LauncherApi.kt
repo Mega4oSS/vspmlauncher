@@ -22,7 +22,7 @@ import kotlinx.serialization.json.Json
 import java.security.MessageDigest
 
 object LauncherConfig {
-    const val BASE_URL = "http://168.222.203.250:8080"
+    const val BASE_URL = "http://play.vspm5.ru:8080"
     //const val BASE_URL = "http://0.0.0.0:8080"
 
     const val MINECRAFT_VERSION = "1.21.1"
